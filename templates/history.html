@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}History - PhishGuard AI{% endblock %}
+{% block page_title %}Analysis History{% endblock %}
+
+{% block content %}
+<div class="history-container">
+    <div class="card">
+        <div class="card-header">
+            <h3>📋 Recent Analyses</h3>
+            {% if history %}
+            <button class="clear-button" onclick="clearHistory()">
+                🗑️ Clear History
+            </button>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if history %}
+                <div class="history-list">
+                    {% for item in history %}
+                    <div class="history-item">
+                        <div class="history-badge badge-{{ item.risk_level|lower }}">
+                            {% if item.risk_level == 'HIGH' %}🔴 HIGH
+                            {% elif item.risk_level == 'MEDIUM' %}🟡 MEDIUM
+                            {% else %}🟢 LOW{% endif %}
+                        </div>
+                        <div class="history-info">
+                            <strong>{{ item.sender }}</strong>
+                            <p>{{ item.subject[:60] }}{% if item.subject|length > 60 %}...{% endif %}</p>
+                            <small>Score: {{ item.risk_score }}/100 • {{ item.timestamp }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <span class="empty-icon">📭</span>
+                    <p>No analysis history yet</p>
+                    <a href="{{ url_for('analyze_page') }}" class="action-button primary">
+                        Analyze Your First Email
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function clearHistory() {
+    if (confirm('Are you sure you want to clear all history?')) {
+        fetch('/clear-history', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+    }
+}
+</script>
+{% endblock %}

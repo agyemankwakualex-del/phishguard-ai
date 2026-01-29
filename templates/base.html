@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PhishGuard AI{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon">🛡️</span>
+                <div class="logo-text">
+                    <h1>PhishGuard AI</h1>
+                    <p>Email Security</p>
+                </div>
+            </div>
+        </div>
+        
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('analyze_page') }}" class="nav-link {% if request.endpoint == 'analyze_page' %}active{% endif %}">
+                    <span class="nav-icon">🔍</span>
+                    <span>Analyze Email</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('history_page') }}" class="nav-link {% if request.endpoint == 'history_page' %}active{% endif %}">
+                    <span class="nav-icon">📋</span>
+                    <span>History</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('settings_page') }}" class="nav-link {% if request.endpoint == 'settings_page' %}active{% endif %}">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('about_page') }}" class="nav-link {% if request.endpoint == 'about_page' %}active{% endif %}">
+                    <span class="nav-icon">ℹ️</span>
+                    <span>About</span>
+                </a>
+            </li>
+        </ul>
+        
+        <!-- User Menu -->
+        <div class="user-menu">
+            <div class="user-info">
+                <span class="user-icon">👤</span>
+                <span class="user-name">{{ current_user.username }}</span>
+            </div>
+            <div class="user-actions">
+                <a href="{{ url_for('profile_page') }}" class="user-link">Profile</a>
+                <a href="{{ url_for('logout') }}" class="user-link logout">Logout</a>
+            </div>
+        </div>
+        
+        <div class="sidebar-footer">
+            <p>Version 2.0.0</p>
+        </div>
+    </nav>
+    
+    <main class="main-content">
+        <header class="page-header">
+            <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+        </header>
+        
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

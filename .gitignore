@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+phishguard.db
+instance/
+*.db
+token.pickle
+config.json
+client_secret.json
+.DS_Store

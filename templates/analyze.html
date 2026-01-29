@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Analyze Email - PhishGuard AI{% endblock %}
+{% block page_title %}Analyze Email{% endblock %}
+
+{% block content %}
+<div class="analyze-container">
+    <div class="card">
+        <div class="card-header">
+            <h3>🔍 Paste Email to Analyze</h3>
+        </div>
+        <div class="card-body">
+            {% if error %}
+            <div class="alert alert-error">
+                {{ error }}
+            </div>
+            {% endif %}
+            
+            <form method="POST" action="{{ url_for('analyze_page') }}" class="analyze-form">
+                <div class="form-group">
+                    <label for="sender">From (Sender Email)</label>
+                    <input type="text" 
+                           id="sender" 
+                           name="sender" 
+                           placeholder="e.g., security@paypal-verify.com"
+                           class="form-input">
+                    <small>Copy the sender's email address here</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subject">Subject Line</label>
+                    <input type="text" 
+                           id="subject" 
+                           name="subject" 
+                           placeholder="e.g., URGENT: Your account has been compromised"
+                           class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="body">Email Body *</label>
+                    <textarea id="body" 
+                              name="body" 
+                              rows="12" 
+                              placeholder="Paste the entire email content here..."
+                              class="form-textarea"
+                              required></textarea>
+                    <small>Copy and paste the full email content including any links</small>
+                </div>
+                
+                <div class="form-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="use_ai" checked>
+                        <span>Use AI Analysis (Groq)</span>
+                    </label>
+                </div>
+                
+                <button type="submit" class="submit-button">
+                    🔍 Analyze Email
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Instructions -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📖 How to Use</h3>
+        </div>
+        <div class="card-body">
+            <ol class="instructions-list">
+                <li>
+                    <strong>Open the suspicious email</strong> in your email client (Gmail, Outlook, etc.)
+                </li>
+                <li>
+                    <strong>Copy the sender's email address</strong> - look for the actual email, not just the display name
+                </li>
+                <li>
+                    <strong>Copy the subject line</strong>
+                </li>
+                <li>
+                    <strong>Select all the email content</strong> (Ctrl+A) and copy it (Ctrl+C)
+                </li>
+                <li>
+                    <strong>Paste everything</strong> into the form above
+                </li>
+                <li>
+                    <strong>Click "Analyze Email"</strong> and wait for the results
+                </li>
+            </ol>
+        </div>
+    </div>
+</div>
+{% endblock %}

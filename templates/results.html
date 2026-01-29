@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis Results - PhishGuard AI{% endblock %}
+{% block page_title %}Analysis Results{% endblock %}
+
+{% block content %}
+<div class="results-container">
+    <!-- Risk Level Header -->
+    <div class="risk-header risk-{{ result.risk_level|lower }}">
+        <div class="risk-badge-large">
+            {% if result.risk_level == 'HIGH' %}
+                🔴 HIGH RISK
+            {% elif result.risk_level == 'MEDIUM' %}
+                🟡 MEDIUM RISK
+            {% else %}
+                🟢 LOW RISK
+            {% endif %}
+        </div>
+        <div class="risk-score">
+            <span class="score-number">{{ result.risk_score }}</span>
+            <span class="score-label">/ 100</span>
+        </div>
+        <div class="risk-type">
+            {% if result.ai_powered %}
+                🤖 AI-Powered Analysis
+            {% else %}
+                📋 Rule-Based Analysis
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Email Info -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📧 Email Information</h3>
+        </div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>From:</label>
+                    <span>{{ email.sender or 'Not provided' }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Subject:</label>
+                    <span>{{ email.subject or 'Not provided' }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Analysis Results -->
+    <div class="card">
+        <div class="card-header">
+            <h3>🔍 Why This Email Was Flagged</h3>
+        </div>
+        <div class="card-body">
+            <ul class="reasons-list">
+                {% for reason in result.reasons %}
+                <li class="reason-item">
+                    <span class="reason-icon">
+                        {% if result.risk_level == 'HIGH' %}⚠️
+                        {% elif result.risk_level == 'MEDIUM' %}⚡
+                        {% else %}✓{% endif %}
+                    </span>
+                    <span>{{ reason }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Recommendation -->
+    <div class="card">
+        <div class="card-header">
+            <h3>💡 Recommendation</h3>
+        </div>
+        <div class="card-body">
+            <div class="recommendation recommendation-{{ result.risk_level|lower }}">
+                {{ result.recommendation }}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Links Found -->
+    {% if links %}
+    <div class="card">
+        <div class="card-header">
+            <h3>🔗 Links Found in Email ({{ links|length }})</h3>
+        </div>
+        <div class="card-body">
+            <div class="links-list">
+                {% for link in links %}
+                <div class="link-item">
+                    <div class="link-url">{{ link[:60] }}{% if link|length > 60 %}...{% endif %}</div>
+                    {% for lr in link_results %}
+                        {% if lr.url == link %}
+                        <div class="link-status status-{{ lr.risk|lower }}">
+                            {% if lr.risk == 'HIGH' %}🔴 Dangerous
+                            {% elif lr.risk == 'MEDIUM' %}🟡 Suspicious
+                            {% elif lr.risk == 'LOW' %}🟢 Safe
+                            {% else %}❓ Unknown{% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% if not link_results %}
+            <p class="muted-text">
+                <small>Add VirusTotal API key in Settings to check links automatically.</small>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Actions -->
+    <div class="results-actions">
+        <a href="{{ url_for('analyze_page') }}" class="action-button primary">
+            🔍 Analyze Another Email
+        </a>
+        <a href="{{ url_for('home') }}" class="action-button secondary">
+            📊 Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - PhishGuard AI{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="welcome-banner">
+    <h3>👋 Welcome, {{ current_user.username }}!</h3>
+    <p>Your email security dashboard</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon blue">📧</div>
+        <div class="stat-info">
+            <h3>{{ stats.total }}</h3>
+            <p>Emails Analyzed</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon red">🔴</div>
+        <div class="stat-info">
+            <h3>{{ stats.high_risk }}</h3>
+            <p>High Risk</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon yellow">🟡</div>
+        <div class="stat-info">
+            <h3>{{ stats.medium_risk }}</h3>
+            <p>Medium Risk</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon green">🟢</div>
+        <div class="stat-info">
+            <h3>{{ stats.low_risk }}</h3>
+            <p>Safe</p>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>⚡ Quick Actions</h3>
+        </div>
+        <div class="card-body">
+            <a href="{{ url_for('analyze_page') }}" class="action-button primary">
+                🔍 Analyze New Email
+            </a>
+            <a href="{{ url_for('history_page') }}" class="action-button secondary">
+                📋 View History
+            </a>
+            <a href="{{ url_for('settings_page') }}" class="action-button secondary">
+                ⚙️ Configure APIs
+            </a>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>⚠️ Recent Threats</h3>
+        </div>
+        <div class="card-body">
+            {% if recent_threats %}
+                {% for threat in recent_threats %}
+                <div class="threat-item">
+                    <div class="threat-badge high">HIGH</div>
+                    <div class="threat-info">
+                        <strong>{{ threat.sender[:30] }}{% if threat.sender|length > 30 %}...{% endif %}</strong>
+                        <p>{{ threat.subject[:40] }}{% if threat.subject|length > 40 %}...{% endif %}</p>
+                        <small>{{ threat.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <span class="empty-icon">✅</span>
+                    <p>No threats detected!</p>
+                    <small>Analyze an email to get started</small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card full-width">
+        <div class="card-header">
+            <h3>💡 Security Tips</h3>
+        </div>
+        <div class="card-body">
+            <div class="tips-grid">
+                <div class="tip">
+                    <span class="tip-icon">🔗</span>
+                    <p><strong>Check Links:</strong> Hover before clicking.</p>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">📧</span>
+                    <p><strong>Verify Sender:</strong> Check email addresses.</p>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">⏰</span>
+                    <p><strong>Beware Urgency:</strong> Scammers rush you.</p>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">🔒</span>
+                    <p><strong>Never Share:</strong> No passwords via email.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

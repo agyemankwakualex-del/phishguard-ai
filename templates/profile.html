@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - PhishGuard AI{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <!-- Profile Info -->
+    <div class="card">
+        <div class="card-header">
+            <h3>👤 Profile Information</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="profile-form">
+                <input type="hidden" name="action" value="update_profile">
+                
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" 
+                           id="username" 
+                           name="username" 
+                           value="{{ current_user.username }}"
+                           class="form-input"
+                           minlength="3"
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" 
+                           value="{{ current_user.email }}"
+                           class="form-input"
+                           disabled>
+                    <small>Email cannot be changed</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Member Since</label>
+                    <input type="text" 
+                           value="{{ current_user.created_at.strftime('%B %d, %Y') }}"
+                           class="form-input"
+                           disabled>
+                </div>
+                
+                <button type="submit" class="submit-button">
+                    Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Change Password -->
+    <div class="card">
+        <div class="card-header">
+            <h3>🔒 Change Password</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="profile-form">
+                <input type="hidden" name="action" value="change_password">
+                
+                <div class="form-group">
+                    <label for="current_password">Current Password</label>
+                    <input type="password" 
+                           id="current_password" 
+                           name="current_password" 
+                           class="form-input"
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="new_password">New Password</label>
+                    <input type="password" 
+                           id="new_password" 
+                           name="new_password" 
+                           class="form-input"
+                           minlength="6"
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password">Confirm New Password</label>
+                    <input type="password" 
+                           id="confirm_password" 
+                           name="confirm_password" 
+                           class="form-input"
+                           required>
+                </div>
+                
+                <button type="submit" class="submit-button">
+                    Change Password
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Account Stats -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📊 Account Statistics</h3>
+        </div>
+        <div class="card-body">
+            <div class="stats-mini">
+                <div class="stat-mini-item">
+                    <span class="stat-mini-value">{{ current_user.analyses|length }}</span>
+                    <span class="stat-mini-label">Emails Analyzed</span>
+                </div>
+                <div class="stat-mini-item">
+                    <span class="stat-mini-value">{{ '✓' if current_user.groq_api_key else '✗' }}</span>
+                    <span class="stat-mini-label">Groq API</span>
+                </div>
+                <div class="stat-mini-item">
+                    <span class="stat-mini-value">{{ '✓' if current_user.virustotal_api_key else '✗' }}</span>
+                    <span class="stat-mini-label">VirusTotal</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

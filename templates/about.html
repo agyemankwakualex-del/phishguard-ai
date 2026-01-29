@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}About - PhishGuard AI{% endblock %}
+{% block page_title %}About{% endblock %}
+
+{% block content %}
+<div class="about-container">
+    <div class="card">
+        <div class="card-header">
+            <h3>🛡️ About PhishGuard AI</h3>
+        </div>
+        <div class="card-body">
+            <p class="about-intro">
+                PhishGuard AI is an intelligent email security assistant that helps you 
+                identify phishing emails and social engineering attacks before they cause harm.
+            </p>
+            
+            <h4>✨ Features</h4>
+            <ul class="feature-list">
+                <li>🤖 <strong>AI-Powered Analysis</strong> - Uses Groq's LLM for intelligent threat detection</li>
+                <li>📋 <strong>Rule-Based Detection</strong> - Catches common phishing patterns</li>
+                <li>🔗 <strong>Link Checking</strong> - Verifies URLs with VirusTotal</li>
+                <li>📊 <strong>Risk Scoring</strong> - Clear risk levels (High, Medium, Low)</li>
+                <li>📝 <strong>Detailed Explanations</strong> - Understand why an email is suspicious</li>
+                <li>🔒 <strong>Privacy Focused</strong> - Your emails are analyzed locally</li>
+            </ul>
+            
+            <h4>🎯 How It Works</h4>
+            <ol class="how-it-works">
+                <li>Paste a suspicious email into the analyzer</li>
+                <li>The AI examines the sender, content, and links</li>
+                <li>You get a detailed risk assessment</li>
+                <li>Make an informed decision about the email</li>
+            </ol>
+            
+            <h4>⚠️ What We Detect</h4>
+            <div class="detection-grid">
+                <div class="detection-item">
+                    <span>🎭</span>
+                    <p>Brand Impersonation</p>
+                </div>
+                <div class="detection-item">
+                    <span>⏰</span>
+                    <p>Urgency Tactics</p>
+                </div>
+                <div class="detection-item">
+                    <span>😰</span>
+                    <p>Fear Tactics</p>
+                </div>
+                <div class="detection-item">
+                    <span>🎁</span>
+                    <p>Fake Rewards</p>
+                </div>
+                <div class="detection-item">
+                    <span>🔗</span>
+                    <p>Malicious Links</p>
+                </div>
+                <div class="detection-item">
+                    <span>📝</span>
+                    <p>Credential Theft</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>📜 Version Info</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Version:</strong> 1.0.0</p>
+            <p><strong>Built with:</strong> Python, Flask, Groq AI</p>
+            <p><strong>License:</strong> Open Source - Free to use</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
