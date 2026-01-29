@@ -1,6 +1,6 @@
 """
 PhishGuard AI - Web Version with User Accounts
-Complete version with login, registration, and user-specific data
+Fixed version for Render deployment
 """
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
@@ -18,10 +18,19 @@ import os
 # ============================================================
 
 app = Flask(__name__)
-app.secret_key = 'phishguard-secret-key-change-in-production-2024'
+
+# Secret key from environment variable or default
+app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 
 # Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///phishguard.db'
+# Use environment variable DATABASE_URL if available, otherwise use SQLite
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db')
+
+# Fix for Render's PostgreSQL (if used later)
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
@@ -31,12 +40,15 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'info'
 
+
 # ============================================================
 # DATABASE MODELS
 # ============================================================
 
 class User(UserMixin, db.Model):
     """User account model"""
+    __tablename__ = 'users'  # Explicit table name
+    
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -47,7 +59,7 @@ class User(UserMixin, db.Model):
     groq_api_key = db.Column(db.String(256), default='')
     virustotal_api_key = db.Column(db.String(256), default='')
     
-    # Gmail tokens (for Part 3)
+    # Gmail tokens (for later)
     gmail_token = db.Column(db.Text, default='')
     gmail_email = db.Column(db.String(120), default='')
     
@@ -63,13 +75,15 @@ class User(UserMixin, db.Model):
 
 class AnalysisHistory(db.Model):
     """Stores email analysis history for each user"""
+    __tablename__ = 'analysis_history'  # Explicit table name
+    
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     sender = db.Column(db.String(200), default='Unknown')
     subject = db.Column(db.String(500), default='')
     risk_level = db.Column(db.String(20), default='LOW')
     risk_score = db.Column(db.Integer, default=0)
-    reasons = db.Column(db.Text, default='[]')  # JSON string
+    reasons = db.Column(db.Text, default='[]')
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
     def get_reasons(self):
@@ -85,6 +99,16 @@ class AnalysisHistory(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+# ============================================================
+# CREATE DATABASE TABLES
+# ============================================================
+
+# This ensures tables are created when the app starts
+with app.app_context():
+    db.create_all()
+    print("✓ Database tables created/verified")
 
 
 # ============================================================
@@ -570,8 +594,6 @@ def about_page():
 @login_required
 def profile_page():
     """User profile page"""
-    message = None
-    
     if request.method == 'POST':
         action = request.form.get('action')
         
@@ -630,24 +652,13 @@ def check_link_api():
 
 
 # ============================================================
-# TEMPLATE CONTEXT
+# HEALTH CHECK (for Render)
 # ============================================================
 
-@app.context_processor
-def inject_user():
-    """Make current_user available in all templates"""
-    return dict(current_user=current_user)
-
-
-# ============================================================
-# DATABASE INITIALIZATION
-# ============================================================
-
-def init_db():
-    """Initialize the database"""
-    with app.app_context():
-        db.create_all()
-        print("✓ Database initialized")
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render"""
+    return jsonify({'status': 'healthy', 'message': 'PhishGuard AI is running'})
 
 
 # ============================================================
@@ -655,12 +666,8 @@ def init_db():
 # ============================================================
 
 if __name__ == '__main__':
-    # Create database tables
-    init_db()
-    
     print("=" * 50)
     print("  PhishGuard AI - Web Version")
-    print("  Now with User Accounts!")
     print("=" * 50)
     print()
     print("  Open your browser and go to:")
