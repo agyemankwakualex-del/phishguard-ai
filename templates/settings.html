@@ -6,97 +6,134 @@
 {% block content %}
 <div class="settings-container">
     {% if message %}
-    <div class="alert alert-success">
-        ✅ {{ message }}
-    </div>
+    <div class="alert alert-success">✅ {{ message }}</div>
     {% endif %}
     
-    <!-- API Settings -->
+    <!-- Gmail Connection -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📧 Gmail Connection</h3>
+        </div>
+        <div class="card-body">
+            {% if config.gmail_connected %}
+            <div class="gmail-status connected">
+                <div class="status-info">
+                    <span class="status-icon">✅</span>
+                    <div>
+                        <strong>Connected</strong>
+                        <p>{{ config.gmail_email }}</p>
+                    </div>
+                </div>
+                <div class="gmail-actions">
+                    <a href="{{ url_for('gmail_scan') }}" class="action-button primary">
+                        🔍 Scan Inbox
+                    </a>
+                    <a href="{{ url_for('gmail_disconnect') }}" class="action-button danger">
+                        ❌ Disconnect
+                    </a>
+                </div>
+            </div>
+            {% elif config.gmail_available %}
+            <div class="gmail-status disconnected">
+                <p>Connect your Gmail to automatically scan your inbox for phishing emails.</p>
+                <a href="{{ url_for('gmail_connect') }}" class="action-button primary">
+                    🔗 Connect Gmail
+                </a>
+            </div>
+            {% else %}
+            <div class="gmail-status unavailable">
+                <p>⚠️ Gmail integration is not configured on this server.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- API Keys -->
     <div class="card">
         <div class="card-header">
             <h3>🔑 API Configuration</h3>
         </div>
         <div class="card-body">
-            <form method="POST" class="settings-form">
-                <!-- Groq API -->
+            <form method="POST">
                 <div class="form-group">
-                    <label for="groq_api_key">
+                    <label>
                         Groq API Key
                         {% if config.groq_configured %}
-                            <span class="status-badge success">✓ Configured</span>
-                        {% else %}
-                            <span class="status-badge warning">Not configured</span>
+                        <span class="status-badge success">✓ Configured</span>
                         {% endif %}
                     </label>
-                    <input type="password" 
-                           id="groq_api_key" 
-                           name="groq_api_key" 
-                           placeholder="Enter your Groq API key (gsk_...)"
-                           class="form-input">
-                    <small>
-                        Used for AI-powered email analysis. 
-                        <a href="https://console.groq.com" target="_blank">Get free key →</a>
-                    </small>
+                    <input type="password" name="groq_api_key" 
+                           placeholder="Enter Groq API key" class="form-input">
+                    <small><a href="https://console.groq.com" target="_blank">Get free key →</a></small>
                 </div>
                 
-                <!-- VirusTotal API -->
                 <div class="form-group">
-                    <label for="virustotal_api_key">
+                    <label>
                         VirusTotal API Key
                         {% if config.virustotal_configured %}
-                            <span class="status-badge success">✓ Configured</span>
-                        {% else %}
-                            <span class="status-badge warning">Not configured</span>
+                        <span class="status-badge success">✓ Configured</span>
                         {% endif %}
                     </label>
-                    <input type="password" 
-                           id="virustotal_api_key" 
-                           name="virustotal_api_key" 
-                           placeholder="Enter your VirusTotal API key"
-                           class="form-input">
-                    <small>
-                        Used for checking suspicious links. 
-                        <a href="https://www.virustotal.com" target="_blank">Get free key →</a>
-                    </small>
+                    <input type="password" name="virustotal_api_key" 
+                           placeholder="Enter VirusTotal API key" class="form-input">
+                    <small><a href="https://www.virustotal.com" target="_blank">Get free key →</a></small>
                 </div>
                 
-                <button type="submit" class="submit-button">
-                    💾 Save Settings
-                </button>
+                <button type="submit" class="submit-button">💾 Save Settings</button>
             </form>
         </div>
     </div>
-    
-    <!-- How to Get API Keys -->
-    <div class="card">
-        <div class="card-header">
-            <h3>📖 How to Get API Keys</h3>
-        </div>
-        <div class="card-body">
-            <div class="api-instructions">
-                <div class="instruction-block">
-                    <h4>🤖 Groq (AI Analysis)</h4>
-                    <ol>
-                        <li>Go to <a href="https://console.groq.com" target="_blank">console.groq.com</a></li>
-                        <li>Sign up for a free account</li>
-                        <li>Go to "API Keys" in the menu</li>
-                        <li>Click "Create API Key"</li>
-                        <li>Copy the key and paste it above</li>
-                    </ol>
-                </div>
-                
-                <div class="instruction-block">
-                    <h4>🔗 VirusTotal (Link Checking)</h4>
-                    <ol>
-                        <li>Go to <a href="https://www.virustotal.com" target="_blank">virustotal.com</a></li>
-                        <li>Sign up for a free account</li>
-                        <li>Click your profile icon (top right)</li>
-                        <li>Select "API Key"</li>
-                        <li>Copy the key and paste it above</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
+
+<style>
+.gmail-status {
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.gmail-status.connected {
+    background: rgba(39, 174, 96, 0.1);
+}
+
+.gmail-status.disconnected {
+    text-align: center;
+    padding: 30px;
+}
+
+.gmail-status.unavailable {
+    background: rgba(243, 156, 18, 0.1);
+    padding: 20px;
+    text-align: center;
+}
+
+.status-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.status-icon {
+    font-size: 28px;
+}
+
+.status-info p {
+    color: #888;
+    margin: 4px 0 0 0;
+    font-size: 14px;
+}
+
+.gmail-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.action-button.danger {
+    background: #e74c3c;
+}
+
+.action-button.danger:hover {
+    background: #c0392b;
+}
+</style>
 {% endblock %}

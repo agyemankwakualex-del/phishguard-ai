@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Gmail Scan - PhishGuard AI{% endblock %}
+{% block page_title %}Gmail Inbox{% endblock %}
+
+{% block content %}
+<div class="gmail-container">
+    <div class="card">
+        <div class="card-header">
+            <h3>📧 Your Gmail Inbox</h3>
+            <span class="gmail-badge">{{ current_user.gmail_email }}</span>
+        </div>
+        <div class="card-body">
+            {% if emails %}
+            <p class="scan-info">Found {{ emails|length }} emails. Click "Analyze" to check for phishing.</p>
+            
+            <div class="email-list">
+                {% for email in emails %}
+                <div class="email-item" id="email-{{ email.id }}">
+                    <div class="email-main">
+                        <div class="email-header">
+                            <span class="email-sender">{{ email.sender }}</span>
+                            <span class="email-date">{{ email.date }}</span>
+                        </div>
+                        <div class="email-subject">{{ email.subject }}</div>
+                        <div class="email-preview">{{ email.body[:150] }}...</div>
+                    </div>
+                    <div class="email-actions">
+                        <button class="btn-analyze" onclick="analyzeEmail('{{ email.id }}', this)">
+                            🔍 Analyze
+                        </button>
+                        <div class="result-area" id="result-{{ email.id }}"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <span class="empty-icon">📭</span>
+                <p>No emails found in your inbox</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <a href="{{ url_for('gmail_scan') }}" class="action-button secondary">🔄 Refresh</a>
+        <a href="{{ url_for('home') }}" class="action-button secondary">📊 Dashboard</a>
+    </div>
+</div>
+
+<style>
+.gmail-container {
+    max-width: 900px;
+}
+
+.gmail-badge {
+    background: #3498db;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+
+.scan-info {
+    color: #6c757d;
+    margin-bottom: 20px;
+}
+
+.email-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.email-item {
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 16px;
+    border-left: 4px solid #3498db;
+}
+
+.email-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.email-sender {
+    font-weight: 600;
+    color: #fff;
+}
+
+.email-date {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.email-subject {
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: #e0e0e0;
+}
+
+.email-preview {
+    font-size: 13px;
+    color: #888;
+    line-height: 1.4;
+}
+
+.email-actions {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn-analyze {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.btn-analyze:hover {
+    background: #2980b9;
+}
+
+.btn-analyze:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+.result-area {
+    flex: 1;
+}
+
+.risk-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.risk-high { background: #e74c3c; color: white; }
+.risk-medium { background: #f39c12; color: white; }
+.risk-low { background: #27ae60; color: white; }
+
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.loading-text {
+    color: #3498db;
+    font-size: 13px;
+}
+
+.error-text {
+    color: #e74c3c;
+    font-size: 13px;
+}
+</style>
+
+<script>
+function analyzeEmail(msgId, btn) {
+    const resultArea = document.getElementById('result-' + msgId);
+    
+    btn.disabled = true;
+    btn.textContent = '⏳ Analyzing...';
+    resultArea.innerHTML = '<span class="loading-text">Checking for phishing...</span>';
+    
+    fetch('/gmail/analyze/' + msgId)
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.textContent = '🔍 Analyze';
+            
+            if (data.error) {
+                resultArea.innerHTML = '<span class="error-text">Error: ' + data.error + '</span>';
+            } else {
+                const riskClass = 'risk-' + data.risk_level.toLowerCase();
+                resultArea.innerHTML = `
+                    <span class="risk-badge ${riskClass}">
+                        ${data.risk_level} RISK (${data.risk_score}/100)
+                    </span>
+                `;
+                
+                // Update border color based on risk
+                const emailItem = document.getElementById('email-' + msgId);
+                if (data.risk_level === 'HIGH') {
+                    emailItem.style.borderLeftColor = '#e74c3c';
+                } else if (data.risk_level === 'MEDIUM') {
+                    emailItem.style.borderLeftColor = '#f39c12';
+                } else {
+                    emailItem.style.borderLeftColor = '#27ae60';
+                }
+            }
+        })
+        .catch(error => {
+            btn.disabled = false;
+            btn.textContent = '🔍 Analyze';
+            resultArea.innerHTML = '<span class="error-text">Failed to analyze</span>';
+        });
+}
+</script>
+{% endblock %}

@@ -1,9 +1,8 @@
 """
-PhishGuard AI - Web Version with User Accounts
-Fixed version for Render deployment
+PhishGuard AI - Complete Version with Gmail Integration
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,6 +11,7 @@ from pathlib import Path
 import json
 import re
 import os
+import base64
 
 # ============================================================
 # APP CONFIGURATION
@@ -19,19 +19,20 @@ import os
 
 app = Flask(__name__)
 
-# Secret key from environment variable or default
+# Secret key
 app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 
-# Database configuration
-# Use environment variable DATABASE_URL if available, otherwise use SQLite
+# Database
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db')
-
-# Fix for Render's PostgreSQL (if used later)
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -46,8 +47,7 @@ login_manager.login_message_category = 'info'
 # ============================================================
 
 class User(UserMixin, db.Model):
-    """User account model"""
-    __tablename__ = 'users'  # Explicit table name
+    __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -55,15 +55,13 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # API Keys (stored per user)
     groq_api_key = db.Column(db.String(256), default='')
     virustotal_api_key = db.Column(db.String(256), default='')
     
-    # Gmail tokens (for later)
     gmail_token = db.Column(db.Text, default='')
+    gmail_refresh_token = db.Column(db.Text, default='')
     gmail_email = db.Column(db.String(120), default='')
     
-    # Relationship to analysis history
     analyses = db.relationship('AnalysisHistory', backref='user', lazy=True)
     
     def set_password(self, password):
@@ -74,8 +72,7 @@ class User(UserMixin, db.Model):
 
 
 class AnalysisHistory(db.Model):
-    """Stores email analysis history for each user"""
-    __tablename__ = 'analysis_history'  # Explicit table name
+    __tablename__ = 'analysis_history'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -101,14 +98,10 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# ============================================================
-# CREATE DATABASE TABLES
-# ============================================================
-
-# This ensures tables are created when the app starts
+# Create tables
 with app.app_context():
     db.create_all()
-    print("✓ Database tables created/verified")
+    print("✓ Database tables ready")
 
 
 # ============================================================
@@ -116,14 +109,11 @@ with app.app_context():
 # ============================================================
 
 class PhishingAnalyzer:
-    """Analyzes emails for phishing indicators"""
-    
     def __init__(self, groq_key='', vt_key=''):
         self.groq_api_key = groq_key
         self.virustotal_api_key = vt_key
     
     def analyze_with_ai(self, email_data):
-        """Use Groq AI to analyze email"""
         if not self.groq_api_key:
             return None
         
@@ -131,35 +121,25 @@ class PhishingAnalyzer:
             from groq import Groq
             client = Groq(api_key=self.groq_api_key)
             
-            prompt = f"""Analyze this email for phishing and social engineering indicators.
+            prompt = f"""Analyze this email for phishing indicators.
 
 FROM: {email_data.get('sender', 'Unknown')}
 SUBJECT: {email_data.get('subject', '')}
 BODY: {email_data.get('body', '')[:1500]}
 
-Respond in this exact JSON format only:
+Respond in JSON format only:
 {{
     "risk_level": "HIGH" or "MEDIUM" or "LOW",
-    "risk_score": <number 0-100>,
+    "risk_score": <0-100>,
     "is_phishing": true or false,
-    "reasons": ["reason 1", "reason 2", "reason 3"],
-    "recommendation": "what the user should do"
-}}
-
-Look for:
-- Sender domain mismatches or suspicious domains
-- Urgency or fear tactics
-- Requests for passwords, money, or personal info
-- Suspicious links
-- Grammar/spelling issues
-- Impersonation of known brands
-
-Only respond with JSON."""
+    "reasons": ["reason1", "reason2"],
+    "recommendation": "what to do"
+}}"""
 
             response = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[
-                    {"role": "system", "content": "You are a cybersecurity expert. Respond with valid JSON only."},
+                    {"role": "system", "content": "You are a cybersecurity expert. Respond with JSON only."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
@@ -168,7 +148,6 @@ Only respond with JSON."""
             
             result_text = response.choices[0].message.content.strip()
             
-            # Clean up response
             if "```" in result_text:
                 result_text = result_text.split("```")[1]
                 if result_text.startswith("json"):
@@ -179,11 +158,10 @@ Only respond with JSON."""
             return result
             
         except Exception as e:
-            print(f"AI Analysis error: {e}")
+            print(f"AI error: {e}")
             return None
     
     def analyze_with_rules(self, email_data):
-        """Rule-based analysis (fallback)"""
         reasons = []
         score = 0
         
@@ -192,80 +170,52 @@ Only respond with JSON."""
         body = email_data.get('body', '').lower()
         full_text = f"{subject} {body}"
         
-        # Urgency check
-        urgency_words = ['urgent', 'immediate', 'act now', 'expire', 'suspended', 'locked', 'asap']
-        if any(word in full_text for word in urgency_words):
+        # Check patterns
+        if any(w in full_text for w in ['urgent', 'immediate', 'act now', 'expire', 'suspended']):
             score += 15
-            reasons.append("Uses urgency tactics to pressure you")
+            reasons.append("Uses urgency tactics")
         
-        # Fear tactics
-        fear_words = ['compromised', 'unauthorized', 'security alert', 'verify your', 'unusual activity']
-        if any(word in full_text for word in fear_words):
+        if any(w in full_text for w in ['compromised', 'unauthorized', 'verify your', 'security alert']):
             score += 20
-            reasons.append("Uses fear tactics about your account")
+            reasons.append("Uses fear tactics")
         
-        # Reward scams
-        reward_words = ['won', 'winner', 'prize', 'lottery', 'congratulations', 'free gift']
-        if any(word in full_text for word in reward_words):
+        if any(w in full_text for w in ['won', 'winner', 'prize', 'lottery', 'congratulations']):
             score += 25
-            reasons.append("Promises rewards or prizes (common scam)")
+            reasons.append("Promises rewards (common scam)")
         
-        # Suspicious domains
-        suspicious_tlds = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz']
-        if any(tld in sender for tld in suspicious_tlds):
+        if any(tld in sender for tld in ['.tk', '.ml', '.ga', '.cf', '.xyz']):
             score += 30
-            reasons.append("Sender uses suspicious domain")
+            reasons.append("Suspicious sender domain")
         
-        # Brand impersonation
         brands = ['paypal', 'apple', 'google', 'microsoft', 'amazon', 'netflix', 'bank']
         for brand in brands:
-            if brand in full_text.lower() and brand not in sender:
+            if brand in full_text and brand not in sender:
                 score += 30
-                reasons.append(f"Possible impersonation of {brand.title()}")
+                reasons.append(f"Possible {brand.title()} impersonation")
                 break
         
-        # Credential requests
-        cred_words = ['password', 'ssn', 'credit card', 'bank account', 'verify your account']
-        if any(word in full_text for word in cred_words):
+        if any(w in full_text for w in ['password', 'ssn', 'credit card', 'bank account']):
             score += 25
             reasons.append("Requests sensitive information")
         
-        # Suspicious links
-        links = re.findall(r'https?://[^\s<>"\'}\]]+', full_text)
-        for link in links:
-            if any(tld in link.lower() for tld in suspicious_tlds):
-                score += 20
-                reasons.append("Contains suspicious links")
-                break
-            if any(short in link.lower() for short in ['bit.ly', 'tinyurl', 'goo.gl']):
-                score += 15
-                reasons.append("Contains shortened URLs")
-                break
+        if any(s in full_text for s in ['bit.ly', 'tinyurl', 'goo.gl']):
+            score += 15
+            reasons.append("Contains shortened URLs")
         
-        # Scam phrases
-        scam_phrases = ['kindly', 'dear customer', 'dear user', 'dear valued']
-        if any(phrase in full_text for phrase in scam_phrases):
+        if any(p in full_text for p in ['kindly', 'dear customer', 'dear user']):
             score += 10
-            reasons.append("Uses unusual phrasing common in scams")
+            reasons.append("Uses scam-like phrasing")
         
-        # Determine risk level
-        if score >= 50:
-            risk_level = "HIGH"
-        elif score >= 25:
-            risk_level = "MEDIUM"
-        else:
-            risk_level = "LOW"
+        risk_level = "HIGH" if score >= 50 else "MEDIUM" if score >= 25 else "LOW"
         
         if not reasons:
-            reasons.append("No obvious phishing indicators detected")
+            reasons.append("No obvious phishing indicators")
         
-        # Recommendation
-        if risk_level == "HIGH":
-            recommendation = "Do NOT click any links or reply. Delete immediately."
-        elif risk_level == "MEDIUM":
-            recommendation = "Be cautious. Verify sender through official channels."
-        else:
-            recommendation = "Email appears safe, but stay vigilant."
+        recommendation = {
+            "HIGH": "Do NOT click links or reply. Delete immediately.",
+            "MEDIUM": "Be cautious. Verify sender through official channels.",
+            "LOW": "Email appears safe, but stay vigilant."
+        }[risk_level]
         
         return {
             "risk_level": risk_level,
@@ -276,73 +226,166 @@ Only respond with JSON."""
             "ai_powered": False
         }
     
-    def check_url_virustotal(self, url):
-        """Check URL with VirusTotal"""
-        if not self.virustotal_api_key:
-            return None
-        
-        try:
-            import requests
-            import base64
-            
-            headers = {"x-apikey": self.virustotal_api_key}
-            url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
-            
-            response = requests.get(
-                f"https://www.virustotal.com/api/v3/urls/{url_id}",
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                stats = data.get('data', {}).get('attributes', {}).get('last_analysis_stats', {})
-                
-                malicious = stats.get('malicious', 0)
-                suspicious = stats.get('suspicious', 0)
-                total_bad = malicious + suspicious
-                
-                if total_bad > 3:
-                    risk = "HIGH"
-                elif total_bad > 0:
-                    risk = "MEDIUM"
-                else:
-                    risk = "LOW"
-                
-                return {
-                    "url": url,
-                    "risk": risk,
-                    "malicious_count": malicious,
-                    "suspicious_count": suspicious,
-                    "message": f"Flagged by {total_bad} security vendors"
-                }
-            
-            return {"url": url, "risk": "UNKNOWN", "message": "Could not analyze"}
-            
-        except Exception as e:
-            return {"url": url, "risk": "ERROR", "message": str(e)}
-    
     def analyze(self, email_data, use_ai=True):
-        """Main analysis function"""
         if use_ai:
-            ai_result = self.analyze_with_ai(email_data)
-            if ai_result:
-                return ai_result
+            result = self.analyze_with_ai(email_data)
+            if result:
+                return result
         return self.analyze_with_rules(email_data)
     
     def extract_links(self, text):
-        """Extract URLs from text"""
-        links = re.findall(r'https?://[^\s<>"\'}\]]+', text)
-        return list(set(links))[:10]
+        return list(set(re.findall(r'https?://[^\s<>"\'}\]]+', text)))[:10]
 
 
 # ============================================================
-# ROUTES - AUTHENTICATION
+# GMAIL HELPER FUNCTIONS
+# ============================================================
+
+def get_gmail_auth_url():
+    """Generate Google OAuth URL"""
+    if not GOOGLE_CLIENT_ID:
+        return None
+    
+    # Determine redirect URI based on environment
+    if os.environ.get('RENDER'):
+        redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 
+            'https://phishguard-ai-g6iu.onrender.com/gmail/callback')
+    else:
+        redirect_uri = 'http://127.0.0.1:5000/gmail/callback'
+    
+    scopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.modify',
+        'https://www.googleapis.com/auth/userinfo.email'
+    ]
+    
+    auth_url = (
+        'https://accounts.google.com/o/oauth2/v2/auth?'
+        f'client_id={GOOGLE_CLIENT_ID}&'
+        f'redirect_uri={redirect_uri}&'
+        'response_type=code&'
+        f'scope={" ".join(scopes)}&'
+        'access_type=offline&'
+        'prompt=consent'
+    )
+    
+    return auth_url
+
+
+def exchange_code_for_tokens(code):
+    """Exchange authorization code for access tokens"""
+    import requests
+    
+    if os.environ.get('RENDER'):
+        redirect_uri = os.environ.get('GMAIL_REDIRECT_URI',
+            'https://phishguard-ai-g6iu.onrender.com/gmail/callback')
+    else:
+        redirect_uri = 'http://127.0.0.1:5000/gmail/callback'
+    
+    token_url = 'https://oauth2.googleapis.com/token'
+    
+    data = {
+        'code': code,
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'redirect_uri': redirect_uri,
+        'grant_type': 'authorization_code'
+    }
+    
+    response = requests.post(token_url, data=data)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Token exchange error: {response.text}")
+        return None
+
+
+def refresh_gmail_token(refresh_token):
+    """Refresh expired access token"""
+    import requests
+    
+    token_url = 'https://oauth2.googleapis.com/token'
+    
+    data = {
+        'refresh_token': refresh_token,
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'grant_type': 'refresh_token'
+    }
+    
+    response = requests.post(token_url, data=data)
+    
+    if response.status_code == 200:
+        return response.json()
+    return None
+
+
+def get_gmail_service(user):
+    """Get authenticated Gmail API service"""
+    if not user.gmail_token:
+        return None
+    
+    try:
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
+        
+        # Check if token needs refresh
+        credentials = Credentials(
+            token=user.gmail_token,
+            refresh_token=user.gmail_refresh_token,
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=GOOGLE_CLIENT_ID,
+            client_secret=GOOGLE_CLIENT_SECRET
+        )
+        
+        # Refresh if expired
+        if credentials.expired and credentials.refresh_token:
+            from google.auth.transport.requests import Request
+            credentials.refresh(Request())
+            
+            user.gmail_token = credentials.token
+            db.session.commit()
+        
+        service = build('gmail', 'v1', credentials=credentials)
+        return service
+        
+    except Exception as e:
+        print(f"Gmail service error: {e}")
+        return None
+
+
+def get_email_body(payload):
+    """Extract email body from Gmail payload"""
+    body = ''
+    
+    if 'body' in payload and payload['body'].get('data'):
+        body = base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8', errors='ignore')
+    
+    if 'parts' in payload:
+        for part in payload['parts']:
+            if part.get('mimeType') == 'text/plain':
+                if 'data' in part.get('body', {}):
+                    body = base64.urlsafe_b64decode(part['body']['data']).decode('utf-8', errors='ignore')
+                    break
+            elif 'parts' in part:
+                body = get_email_body(part)
+                if body:
+                    break
+    
+    # Clean HTML tags
+    body = re.sub(r'<[^>]+>', ' ', body)
+    body = re.sub(r'\s+', ' ', body).strip()
+    
+    return body[:2000]
+
+
+# ============================================================
+# AUTH ROUTES
 # ============================================================
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """User registration page"""
     if current_user.is_authenticated:
         return redirect(url_for('home'))
     
@@ -350,42 +393,33 @@ def register():
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
+        confirm = request.form.get('confirm_password', '')
         
-        # Validation
         errors = []
-        
         if len(username) < 3:
             errors.append("Username must be at least 3 characters")
-        
         if not re.match(r'^[\w.-]+@[\w.-]+\.\w+$', email):
-            errors.append("Please enter a valid email address")
-        
+            errors.append("Invalid email address")
         if len(password) < 6:
             errors.append("Password must be at least 6 characters")
-        
-        if password != confirm_password:
-            errors.append("Passwords do not match")
-        
+        if password != confirm:
+            errors.append("Passwords don't match")
         if User.query.filter_by(email=email).first():
             errors.append("Email already registered")
-        
         if User.query.filter_by(username=username).first():
-            errors.append("Username already taken")
+            errors.append("Username taken")
         
         if errors:
-            for error in errors:
-                flash(error, 'error')
+            for e in errors:
+                flash(e, 'error')
             return render_template('register.html')
         
-        # Create user
         user = User(username=username, email=email)
         user.set_password(password)
-        
         db.session.add(user)
         db.session.commit()
         
-        flash('Account created successfully! Please log in.', 'success')
+        flash('Account created! Please log in.', 'success')
         return redirect(url_for('login'))
     
     return render_template('register.html')
@@ -393,7 +427,6 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """User login page"""
     if current_user.is_authenticated:
         return redirect(url_for('home'))
     
@@ -406,12 +439,11 @@ def login():
         
         if user and user.check_password(password):
             login_user(user, remember=remember)
-            flash(f'Welcome back, {user.username}!', 'success')
-            
+            flash(f'Welcome, {user.username}!', 'success')
             next_page = request.args.get('next')
             return redirect(next_page if next_page else url_for('home'))
-        else:
-            flash('Invalid email or password', 'error')
+        
+        flash('Invalid email or password', 'error')
     
     return render_template('login.html')
 
@@ -419,38 +451,28 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
-    """Log out user"""
     logout_user()
-    flash('You have been logged out.', 'info')
+    flash('Logged out.', 'info')
     return redirect(url_for('login'))
 
 
 # ============================================================
-# ROUTES - MAIN PAGES
+# MAIN ROUTES
 # ============================================================
 
 @app.route('/')
 @login_required
 def home():
-    """Dashboard - requires login"""
-    # Get user's analysis history
     history = AnalysisHistory.query.filter_by(user_id=current_user.id)\
         .order_by(AnalysisHistory.timestamp.desc()).all()
     
-    # Calculate stats
-    total = len(history)
-    high_risk = len([h for h in history if h.risk_level == 'HIGH'])
-    medium_risk = len([h for h in history if h.risk_level == 'MEDIUM'])
-    low_risk = len([h for h in history if h.risk_level == 'LOW'])
-    
     stats = {
-        'total': total,
-        'high_risk': high_risk,
-        'medium_risk': medium_risk,
-        'low_risk': low_risk
+        'total': len(history),
+        'high_risk': len([h for h in history if h.risk_level == 'HIGH']),
+        'medium_risk': len([h for h in history if h.risk_level == 'MEDIUM']),
+        'low_risk': len([h for h in history if h.risk_level == 'LOW'])
     }
     
-    # Recent threats
     recent_threats = [h for h in history if h.risk_level == 'HIGH'][:5]
     
     return render_template('index.html', stats=stats, recent_threats=recent_threats)
@@ -459,7 +481,6 @@ def home():
 @app.route('/analyze', methods=['GET', 'POST'])
 @login_required
 def analyze_page():
-    """Analyze email page"""
     if request.method == 'POST':
         sender = request.form.get('sender', '').strip()
         subject = request.form.get('subject', '').strip()
@@ -469,54 +490,30 @@ def analyze_page():
         if not body:
             return render_template('analyze.html', error="Please enter email content.")
         
-        email_data = {
-            'sender': sender,
-            'subject': subject,
-            'body': body
-        }
+        email_data = {'sender': sender, 'subject': subject, 'body': body}
         
-        # Create analyzer with user's API keys
         analyzer = PhishingAnalyzer(
             groq_key=current_user.groq_api_key,
             vt_key=current_user.virustotal_api_key
         )
         
-        # Analyze
         result = analyzer.analyze(email_data, use_ai=use_ai)
-        
-        # Extract and check links
         links = analyzer.extract_links(body)
-        link_results = []
-        
-        if links and current_user.virustotal_api_key:
-            for link in links[:3]:
-                vt_result = analyzer.check_url_virustotal(link)
-                if vt_result:
-                    link_results.append(vt_result)
-                    if vt_result.get('risk') == 'HIGH':
-                        result['risk_level'] = 'HIGH'
-                        result['risk_score'] = max(result.get('risk_score', 0), 80)
-                        if "Dangerous link detected" not in str(result['reasons']):
-                            result['reasons'].append("Dangerous link detected by VirusTotal")
         
         # Save to history
-        history_entry = AnalysisHistory(
+        entry = AnalysisHistory(
             user_id=current_user.id,
             sender=sender or 'Unknown',
             subject=subject or '(No Subject)',
             risk_level=result['risk_level'],
             risk_score=result['risk_score']
         )
-        history_entry.set_reasons(result['reasons'][:5])
-        
-        db.session.add(history_entry)
+        entry.set_reasons(result['reasons'][:5])
+        db.session.add(entry)
         db.session.commit()
         
-        return render_template('results.html',
-                             result=result,
-                             email=email_data,
-                             links=links,
-                             link_results=link_results)
+        return render_template('results.html', result=result, email=email_data, 
+                             links=links, link_results=[])
     
     return render_template('analyze.html')
 
@@ -524,30 +521,25 @@ def analyze_page():
 @app.route('/history')
 @login_required
 def history_page():
-    """View user's analysis history"""
     history = AnalysisHistory.query.filter_by(user_id=current_user.id)\
         .order_by(AnalysisHistory.timestamp.desc()).limit(50).all()
     
-    # Format for template
-    formatted_history = []
-    for item in history:
-        formatted_history.append({
-            'id': item.id,
-            'sender': item.sender,
-            'subject': item.subject,
-            'risk_level': item.risk_level,
-            'risk_score': item.risk_score,
-            'timestamp': item.timestamp.strftime('%Y-%m-%d %H:%M'),
-            'reasons': item.get_reasons()
-        })
+    formatted = [{
+        'id': h.id,
+        'sender': h.sender,
+        'subject': h.subject,
+        'risk_level': h.risk_level,
+        'risk_score': h.risk_score,
+        'timestamp': h.timestamp.strftime('%Y-%m-%d %H:%M'),
+        'reasons': h.get_reasons()
+    } for h in history]
     
-    return render_template('history.html', history=formatted_history)
+    return render_template('history.html', history=formatted)
 
 
 @app.route('/clear-history', methods=['POST'])
 @login_required
 def clear_history():
-    """Clear user's analysis history"""
     AnalysisHistory.query.filter_by(user_id=current_user.id).delete()
     db.session.commit()
     return jsonify({'success': True})
@@ -556,28 +548,26 @@ def clear_history():
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings_page():
-    """User settings page"""
     message = None
     
     if request.method == 'POST':
         groq_key = request.form.get('groq_api_key', '').strip()
         vt_key = request.form.get('virustotal_api_key', '').strip()
         
-        # Update user's API keys
         if groq_key:
             current_user.groq_api_key = groq_key
         if vt_key:
             current_user.virustotal_api_key = vt_key
         
         db.session.commit()
-        message = "Settings saved successfully!"
+        message = "Settings saved!"
     
-    # Prepare display config
     config = {
         'groq_configured': bool(current_user.groq_api_key),
         'virustotal_configured': bool(current_user.virustotal_api_key),
         'gmail_connected': bool(current_user.gmail_email),
-        'gmail_email': current_user.gmail_email
+        'gmail_email': current_user.gmail_email,
+        'gmail_available': bool(GOOGLE_CLIENT_ID)
     }
     
     return render_template('settings.html', config=config, message=message)
@@ -586,94 +576,259 @@ def settings_page():
 @app.route('/about')
 @login_required
 def about_page():
-    """About page"""
     return render_template('about.html')
 
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile_page():
-    """User profile page"""
     if request.method == 'POST':
         action = request.form.get('action')
         
         if action == 'update_profile':
             new_username = request.form.get('username', '').strip()
-            
             if len(new_username) >= 3:
                 existing = User.query.filter_by(username=new_username).first()
                 if existing and existing.id != current_user.id:
-                    flash('Username already taken', 'error')
+                    flash('Username taken', 'error')
                 else:
                     current_user.username = new_username
                     db.session.commit()
                     flash('Profile updated!', 'success')
         
         elif action == 'change_password':
-            current_password = request.form.get('current_password', '')
-            new_password = request.form.get('new_password', '')
-            confirm_password = request.form.get('confirm_password', '')
+            current_pw = request.form.get('current_password', '')
+            new_pw = request.form.get('new_password', '')
+            confirm_pw = request.form.get('confirm_password', '')
             
-            if not current_user.check_password(current_password):
-                flash('Current password is incorrect', 'error')
-            elif len(new_password) < 6:
-                flash('New password must be at least 6 characters', 'error')
-            elif new_password != confirm_password:
-                flash('New passwords do not match', 'error')
+            if not current_user.check_password(current_pw):
+                flash('Current password incorrect', 'error')
+            elif len(new_pw) < 6:
+                flash('Password must be 6+ characters', 'error')
+            elif new_pw != confirm_pw:
+                flash('Passwords don\'t match', 'error')
             else:
-                current_user.set_password(new_password)
+                current_user.set_password(new_pw)
                 db.session.commit()
-                flash('Password changed successfully!', 'success')
+                flash('Password changed!', 'success')
     
     return render_template('profile.html')
 
 
 # ============================================================
-# API ROUTES
+# GMAIL ROUTES
 # ============================================================
 
-@app.route('/api/check-link', methods=['POST'])
+@app.route('/gmail/connect')
 @login_required
-def check_link_api():
-    """API to check a single link"""
-    data = request.get_json()
-    url = data.get('url', '')
+def gmail_connect():
+    """Start Gmail OAuth flow"""
+    auth_url = get_gmail_auth_url()
     
-    if not url:
-        return jsonify({'error': 'No URL provided'})
+    if not auth_url:
+        flash('Gmail integration not configured. Please contact admin.', 'error')
+        return redirect(url_for('settings_page'))
     
-    if not current_user.virustotal_api_key:
-        return jsonify({'error': 'VirusTotal API key not configured'})
+    return redirect(auth_url)
+
+
+@app.route('/gmail/callback')
+@login_required
+def gmail_callback():
+    """Handle Gmail OAuth callback"""
+    code = request.args.get('code')
+    error = request.args.get('error')
     
-    analyzer = PhishingAnalyzer(vt_key=current_user.virustotal_api_key)
-    result = analyzer.check_url_virustotal(url)
+    if error:
+        flash(f'Gmail connection cancelled: {error}', 'error')
+        return redirect(url_for('settings_page'))
     
-    return jsonify(result if result else {'error': 'Could not check URL'})
+    if not code:
+        flash('No authorization code received', 'error')
+        return redirect(url_for('settings_page'))
+    
+    # Exchange code for tokens
+    tokens = exchange_code_for_tokens(code)
+    
+    if not tokens:
+        flash('Failed to get access token', 'error')
+        return redirect(url_for('settings_page'))
+    
+    # Save tokens
+    current_user.gmail_token = tokens.get('access_token', '')
+    current_user.gmail_refresh_token = tokens.get('refresh_token', '')
+    
+    # Get user's Gmail address
+    try:
+        import requests
+        headers = {'Authorization': f'Bearer {tokens["access_token"]}'}
+        resp = requests.get('https://www.googleapis.com/oauth2/v2/userinfo', headers=headers)
+        if resp.status_code == 200:
+            current_user.gmail_email = resp.json().get('email', '')
+    except:
+        pass
+    
+    db.session.commit()
+    
+    flash(f'Gmail connected: {current_user.gmail_email}', 'success')
+    return redirect(url_for('settings_page'))
+
+
+@app.route('/gmail/disconnect')
+@login_required
+def gmail_disconnect():
+    """Disconnect Gmail"""
+    current_user.gmail_token = ''
+    current_user.gmail_refresh_token = ''
+    current_user.gmail_email = ''
+    db.session.commit()
+    
+    flash('Gmail disconnected', 'info')
+    return redirect(url_for('settings_page'))
+
+
+@app.route('/gmail/scan')
+@login_required
+def gmail_scan():
+    """Scan Gmail inbox"""
+    if not current_user.gmail_token:
+        flash('Please connect Gmail first', 'error')
+        return redirect(url_for('settings_page'))
+    
+    service = get_gmail_service(current_user)
+    
+    if not service:
+        flash('Gmail connection expired. Please reconnect.', 'error')
+        current_user.gmail_token = ''
+        current_user.gmail_email = ''
+        db.session.commit()
+        return redirect(url_for('settings_page'))
+    
+    try:
+        # Get emails
+        results = service.users().messages().list(
+            userId='me',
+            labelIds=['INBOX'],
+            maxResults=20
+        ).execute()
+        
+        messages = results.get('messages', [])
+        emails = []
+        
+        for msg in messages:
+            msg_data = service.users().messages().get(
+                userId='me',
+                id=msg['id'],
+                format='full'
+            ).execute()
+            
+            headers = msg_data.get('payload', {}).get('headers', [])
+            
+            subject = ''
+            sender = ''
+            date = ''
+            
+            for h in headers:
+                name = h.get('name', '').lower()
+                if name == 'subject':
+                    subject = h.get('value', '')
+                elif name == 'from':
+                    sender = h.get('value', '')
+                elif name == 'date':
+                    date = h.get('value', '')[:25]
+            
+            body = get_email_body(msg_data.get('payload', {}))
+            
+            emails.append({
+                'id': msg['id'],
+                'sender': sender[:50] if sender else 'Unknown',
+                'subject': subject[:60] if subject else '(No Subject)',
+                'body': body[:300],
+                'date': date
+            })
+        
+        return render_template('gmail_scan.html', emails=emails)
+        
+    except Exception as e:
+        flash(f'Error fetching emails: {str(e)}', 'error')
+        return redirect(url_for('home'))
+
+
+@app.route('/gmail/analyze/<msg_id>')
+@login_required
+def gmail_analyze_message(msg_id):
+    """Analyze a specific Gmail message"""
+    service = get_gmail_service(current_user)
+    
+    if not service:
+        return jsonify({'error': 'Gmail not connected'})
+    
+    try:
+        msg_data = service.users().messages().get(
+            userId='me',
+            id=msg_id,
+            format='full'
+        ).execute()
+        
+        headers = msg_data.get('payload', {}).get('headers', [])
+        
+        subject = ''
+        sender = ''
+        
+        for h in headers:
+            name = h.get('name', '').lower()
+            if name == 'subject':
+                subject = h.get('value', '')
+            elif name == 'from':
+                sender = h.get('value', '')
+        
+        body = get_email_body(msg_data.get('payload', {}))
+        
+        analyzer = PhishingAnalyzer(
+            groq_key=current_user.groq_api_key,
+            vt_key=current_user.virustotal_api_key
+        )
+        
+        result = analyzer.analyze({
+            'sender': sender,
+            'subject': subject,
+            'body': body
+        })
+        
+        # Save to history
+        entry = AnalysisHistory(
+            user_id=current_user.id,
+            sender=sender[:200] if sender else 'Unknown',
+            subject=subject[:500] if subject else '(No Subject)',
+            risk_level=result['risk_level'],
+            risk_score=result['risk_score']
+        )
+        entry.set_reasons(result['reasons'][:5])
+        db.session.add(entry)
+        db.session.commit()
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 
 # ============================================================
-# HEALTH CHECK (for Render)
+# HEALTH CHECK
 # ============================================================
 
 @app.route('/health')
-def health_check():
-    """Health check endpoint for Render"""
-    return jsonify({'status': 'healthy', 'message': 'PhishGuard AI is running'})
+def health():
+    return jsonify({'status': 'ok'})
 
 
 # ============================================================
-# RUN THE APP
+# RUN
 # ============================================================
 
 if __name__ == '__main__':
     print("=" * 50)
-    print("  PhishGuard AI - Web Version")
-    print("=" * 50)
-    print()
-    print("  Open your browser and go to:")
+    print("  PhishGuard AI")
     print("  http://127.0.0.1:5000")
-    print()
-    print("  Press Ctrl+C to stop")
     print("=" * 50)
-    
     app.run(debug=True, host='127.0.0.1', port=5000)
