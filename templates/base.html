@@ -1,95 +1,158 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PhishGuard AI{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
 </head>
 <body>
-    <nav class="sidebar">
-        <div class="sidebar-header">
-            <div class="logo">
-                <span class="logo-icon">🛡️</span>
-                <div class="logo-text">
-                    <h1>PhishGuard AI</h1>
-                    <p>Email Security</p>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">🛡️</span>
+                    <div class="logo-text">
+                        <h1>PhishGuard AI</h1>
+                        <p>Email Security</p>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <ul class="nav-menu">
-            <li class="nav-item">
-                <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">
-                    <span class="nav-icon">📊</span>
-                    <span>Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ url_for('analyze_page') }}" class="nav-link {% if request.endpoint == 'analyze_page' %}active{% endif %}">
-                    <span class="nav-icon">🔍</span>
-                    <span>Analyze Email</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ url_for('history_page') }}" class="nav-link {% if request.endpoint == 'history_page' %}active{% endif %}">
-                    <span class="nav-icon">📋</span>
-                    <span>History</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ url_for('settings_page') }}" class="nav-link {% if request.endpoint == 'settings_page' %}active{% endif %}">
-                    <span class="nav-icon">⚙️</span>
-                    <span>Settings</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ url_for('about_page') }}" class="nav-link {% if request.endpoint == 'about_page' %}active{% endif %}">
-                    <span class="nav-icon">ℹ️</span>
-                    <span>About</span>
-                </a>
-            </li>
-        </ul>
-        
-        <!-- User Menu -->
-        <div class="user-menu">
-            <div class="user-info">
-                <span class="user-icon">👤</span>
-                <span class="user-name">{{ current_user.username }}</span>
-            </div>
-            <div class="user-actions">
-                <a href="{{ url_for('profile_page') }}" class="user-link">Profile</a>
-                <a href="{{ url_for('logout') }}" class="user-link logout">Logout</a>
-            </div>
-        </div>
-        
-        <div class="sidebar-footer">
-            <p>Version 2.0.0</p>
-        </div>
-    </nav>
-    
-    <main class="main-content">
-        <header class="page-header">
-            <h2>{% block page_title %}Dashboard{% endblock %}</h2>
-        </header>
-        
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">
-                    {{ message }}
+            
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">
+                        <span class="nav-icon">📊</span>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('analyze_page') }}" class="nav-link {% if request.endpoint == 'analyze_page' %}active{% endif %}">
+                        <span class="nav-icon">🔍</span>
+                        <span>Analyze Email</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('history_page') }}" class="nav-link {% if request.endpoint == 'history_page' %}active{% endif %}">
+                        <span class="nav-icon">📋</span>
+                        <span>History</span>
+                    </a>
+                </li>
+                {% if current_user.gmail_email %}
+                <li class="nav-item">
+                    <a href="{{ url_for('gmail_scan') }}" class="nav-link {% if request.endpoint == 'gmail_scan' %}active{% endif %}">
+                        <span class="nav-icon">📧</span>
+                        <span>Gmail Scan</span>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="nav-item">
+                    <a href="{{ url_for('settings_page') }}" class="nav-link {% if request.endpoint == 'settings_page' %}active{% endif %}">
+                        <span class="nav-icon">⚙️</span>
+                        <span>Settings</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('about_page') }}" class="nav-link {% if request.endpoint == 'about_page' %}active{% endif %}">
+                        <span class="nav-icon">ℹ️</span>
+                        <span>About</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <!-- User Menu -->
+            <div class="user-menu">
+                <div class="user-info">
+                    <div class="user-avatar">{{ current_user.username[0].upper() }}</div>
+                    <div class="user-details">
+                        <span class="user-name">{{ current_user.username }}</span>
+                        <span class="user-email">{{ current_user.email[:20] }}{% if current_user.email|length > 20 %}...{% endif %}</span>
+                    </div>
                 </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+                <div class="user-actions">
+                    <a href="{{ url_for('profile_page') }}" class="user-link">Profile</a>
+                    <a href="{{ url_for('logout') }}" class="user-link logout">Logout</a>
+                </div>
+            </div>
+            
+            <!-- Theme Toggle -->
+            <div class="theme-toggle">
+                <label>Theme</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            
+            <div class="sidebar-footer">
+                <p>PhishGuard AI v2.0</p>
+            </div>
+        </nav>
         
-        <div class="content">
-            {% block content %}{% endblock %}
-        </div>
-    </main>
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <h2>
+                    <span class="icon">{% block page_icon %}📊{% endblock %}</span>
+                    {% block page_title %}Dashboard{% endblock %}
+                </h2>
+                {% block header_actions %}{% endblock %}
+            </header>
+            
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {% if category == 'success' %}✅{% elif category == 'error' %}❌{% elif category == 'info' %}ℹ️{% else %}⚠️{% endif %}
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
     
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Theme Toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.getElementById('themeToggle').checked = savedTheme === 'light';
+        
+        // Mobile Menu
+        function toggleMobileMenu() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+        
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(e) {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.querySelector('.mobile-menu-toggle');
+            if (!sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                sidebar.classList.remove('open');
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

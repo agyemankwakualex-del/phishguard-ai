@@ -1,49 +1,54 @@
 {% extends "base.html" %}
 
 {% block title %}Dashboard - PhishGuard AI{% endblock %}
+{% block page_icon %}📊{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- Welcome Banner -->
 <div class="welcome-banner">
-    <h3>👋 Welcome, {{ current_user.username }}!</h3>
-    <p>Your email security dashboard</p>
+    <h3>👋 Welcome back, {{ current_user.username }}!</h3>
+    <p>Your email security dashboard - Stay protected from phishing attacks</p>
 </div>
 
+<!-- Stats Grid -->
 <div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-icon blue">📧</div>
+    <div class="stat-card blue">
+        <div class="stat-icon">📧</div>
         <div class="stat-info">
             <h3>{{ stats.total }}</h3>
             <p>Emails Analyzed</p>
         </div>
     </div>
     
-    <div class="stat-card">
-        <div class="stat-icon red">🔴</div>
+    <div class="stat-card red">
+        <div class="stat-icon">🔴</div>
         <div class="stat-info">
             <h3>{{ stats.high_risk }}</h3>
             <p>High Risk</p>
         </div>
     </div>
     
-    <div class="stat-card">
-        <div class="stat-icon yellow">🟡</div>
+    <div class="stat-card yellow">
+        <div class="stat-icon">🟡</div>
         <div class="stat-info">
             <h3>{{ stats.medium_risk }}</h3>
             <p>Medium Risk</p>
         </div>
     </div>
     
-    <div class="stat-card">
-        <div class="stat-icon green">🟢</div>
+    <div class="stat-card green">
+        <div class="stat-icon">🟢</div>
         <div class="stat-info">
             <h3>{{ stats.low_risk }}</h3>
-            <p>Safe</p>
+            <p>Safe Emails</p>
         </div>
     </div>
 </div>
 
+<!-- Dashboard Grid -->
 <div class="dashboard-grid">
+    <!-- Quick Actions -->
     <div class="card">
         <div class="card-header">
             <h3>⚡ Quick Actions</h3>
@@ -52,15 +57,22 @@
             <a href="{{ url_for('analyze_page') }}" class="action-button primary">
                 🔍 Analyze New Email
             </a>
+            {% if current_user.gmail_email %}
+            <a href="{{ url_for('gmail_scan') }}" class="action-button secondary">
+                📧 Scan Gmail Inbox
+            </a>
+            {% else %}
+            <a href="{{ url_for('settings_page') }}" class="action-button secondary">
+                🔗 Connect Gmail
+            </a>
+            {% endif %}
             <a href="{{ url_for('history_page') }}" class="action-button secondary">
                 📋 View History
-            </a>
-            <a href="{{ url_for('settings_page') }}" class="action-button secondary">
-                ⚙️ Configure APIs
             </a>
         </div>
     </div>
     
+    <!-- Recent Threats -->
     <div class="card">
         <div class="card-header">
             <h3>⚠️ Recent Threats</h3>
@@ -81,12 +93,13 @@
                 <div class="empty-state">
                     <span class="empty-icon">✅</span>
                     <p>No threats detected!</p>
-                    <small>Analyze an email to get started</small>
+                    <small>Your inbox looks clean</small>
                 </div>
             {% endif %}
         </div>
     </div>
     
+    <!-- Security Tips -->
     <div class="card full-width">
         <div class="card-header">
             <h3>💡 Security Tips</h3>
@@ -95,19 +108,19 @@
             <div class="tips-grid">
                 <div class="tip">
                     <span class="tip-icon">🔗</span>
-                    <p><strong>Check Links:</strong> Hover before clicking.</p>
+                    <p><strong>Check Links:</strong> Hover over links before clicking to see the real destination.</p>
                 </div>
                 <div class="tip">
                     <span class="tip-icon">📧</span>
-                    <p><strong>Verify Sender:</strong> Check email addresses.</p>
+                    <p><strong>Verify Sender:</strong> Check if the email address matches the company they claim to be.</p>
                 </div>
                 <div class="tip">
                     <span class="tip-icon">⏰</span>
-                    <p><strong>Beware Urgency:</strong> Scammers rush you.</p>
+                    <p><strong>Beware Urgency:</strong> Scammers create false urgency to make you act without thinking.</p>
                 </div>
                 <div class="tip">
                     <span class="tip-icon">🔒</span>
-                    <p><strong>Never Share:</strong> No passwords via email.</p>
+                    <p><strong>Never Share:</strong> Legitimate companies never ask for passwords via email.</p>
                 </div>
             </div>
         </div>
