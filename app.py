@@ -1,5 +1,6 @@
 """
 PhishGuard AI - Complete Version with Gmail Integration
+Fixed version with proper URL encoding
 """
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
@@ -7,11 +8,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-from pathlib import Path
 import json
 import re
 import os
 import base64
+import urllib.parse
 
 # ============================================================
 # APP CONFIGURATION
@@ -30,10 +31,9 @@ if database_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Google OAuth Configuration
-# Google OAuth Configuration (strip removes any extra spaces/newlines)
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
+# Google OAuth Configuration - strip removes extra spaces/newlines
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip().replace('\n', '').replace('\r', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip().replace('\n', '').replace('\r', '')
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -171,7 +171,6 @@ Respond in JSON format only:
         body = email_data.get('body', '').lower()
         full_text = f"{subject} {body}"
         
-        # Check patterns
         if any(w in full_text for w in ['urgent', 'immediate', 'act now', 'expire', 'suspended']):
             score += 15
             reasons.append("Uses urgency tactics")
@@ -244,15 +243,20 @@ Respond in JSON format only:
 
 def get_gmail_auth_url():
     """Generate Google OAuth URL"""
-    if not GOOGLE_CLIENT_ID:
+    client_id = GOOGLE_CLIENT_ID
+    
+    if not client_id:
         return None
     
-    # Determine redirect URI based on environment
+    # Determine redirect URI
     if os.environ.get('RENDER'):
         redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 
             'https://phishguard-ai-g6iu.onrender.com/gmail/callback')
     else:
         redirect_uri = 'http://127.0.0.1:5000/gmail/callback'
+    
+    # Clean redirect URI
+    redirect_uri = redirect_uri.strip().replace('\n', '').replace('\r', '')
     
     scopes = [
         'https://www.googleapis.com/auth/gmail.readonly',
@@ -260,15 +264,17 @@ def get_gmail_auth_url():
         'https://www.googleapis.com/auth/userinfo.email'
     ]
     
-    auth_url = (
-        'https://accounts.google.com/o/oauth2/v2/auth?'
-        f'client_id={GOOGLE_CLIENT_ID}&'
-        f'redirect_uri={redirect_uri}&'
-        'response_type=code&'
-        f'scope={" ".join(scopes)}&'
-        'access_type=offline&'
-        'prompt=consent'
-    )
+    # Build URL with proper encoding
+    params = {
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': ' '.join(scopes),
+        'access_type': 'offline',
+        'prompt': 'consent'
+    }
+    
+    auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
     
     return auth_url
 
@@ -282,6 +288,8 @@ def exchange_code_for_tokens(code):
             'https://phishguard-ai-g6iu.onrender.com/gmail/callback')
     else:
         redirect_uri = 'http://127.0.0.1:5000/gmail/callback'
+    
+    redirect_uri = redirect_uri.strip().replace('\n', '').replace('\r', '')
     
     token_url = 'https://oauth2.googleapis.com/token'
     
@@ -302,26 +310,6 @@ def exchange_code_for_tokens(code):
         return None
 
 
-def refresh_gmail_token(refresh_token):
-    """Refresh expired access token"""
-    import requests
-    
-    token_url = 'https://oauth2.googleapis.com/token'
-    
-    data = {
-        'refresh_token': refresh_token,
-        'client_id': GOOGLE_CLIENT_ID,
-        'client_secret': GOOGLE_CLIENT_SECRET,
-        'grant_type': 'refresh_token'
-    }
-    
-    response = requests.post(token_url, data=data)
-    
-    if response.status_code == 200:
-        return response.json()
-    return None
-
-
 def get_gmail_service(user):
     """Get authenticated Gmail API service"""
     if not user.gmail_token:
@@ -331,7 +319,6 @@ def get_gmail_service(user):
         from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
         
-        # Check if token needs refresh
         credentials = Credentials(
             token=user.gmail_token,
             refresh_token=user.gmail_refresh_token,
@@ -340,11 +327,9 @@ def get_gmail_service(user):
             client_secret=GOOGLE_CLIENT_SECRET
         )
         
-        # Refresh if expired
         if credentials.expired and credentials.refresh_token:
             from google.auth.transport.requests import Request
             credentials.refresh(Request())
-            
             user.gmail_token = credentials.token
             db.session.commit()
         
@@ -374,7 +359,6 @@ def get_email_body(payload):
                 if body:
                     break
     
-    # Clean HTML tags
     body = re.sub(r'<[^>]+>', ' ', body)
     body = re.sub(r'\s+', ' ', body).strip()
     
@@ -501,7 +485,6 @@ def analyze_page():
         result = analyzer.analyze(email_data, use_ai=use_ai)
         links = analyzer.extract_links(body)
         
-        # Save to history
         entry = AnalysisHistory(
             user_id=current_user.id,
             sender=sender or 'Unknown',
@@ -607,7 +590,7 @@ def profile_page():
             elif len(new_pw) < 6:
                 flash('Password must be 6+ characters', 'error')
             elif new_pw != confirm_pw:
-                flash('Passwords don\'t match', 'error')
+                flash("Passwords don't match", 'error')
             else:
                 current_user.set_password(new_pw)
                 db.session.commit()
@@ -622,45 +605,16 @@ def profile_page():
 
 @app.route('/gmail/connect')
 @login_required
-def get_gmail_auth_url():
-    """Generate Google OAuth URL"""
-    # Clean the client ID (remove any whitespace/newlines)
-    client_id = GOOGLE_CLIENT_ID.strip().replace('\n', '').replace('\r', '')
+def gmail_connect():
+    """Start Gmail OAuth flow"""
+    auth_url = get_gmail_auth_url()
     
-    if not client_id:
-        return None
+    if not auth_url:
+        flash('Gmail integration not configured. Please contact admin.', 'error')
+        return redirect(url_for('settings_page'))
     
-    # Determine redirect URI based on environment
-    if os.environ.get('RENDER'):
-        redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 
-            'https://phishguard-ai-g6iu.onrender.com/gmail/callback')
-    else:
-        redirect_uri = 'http://127.0.0.1:5000/gmail/callback'
-    
-    # Clean the redirect URI
-    redirect_uri = redirect_uri.strip().replace('\n', '').replace('\r', '')
-    
-    scopes = [
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/gmail.modify',
-        'https://www.googleapis.com/auth/userinfo.email'
-    ]
-    
-    # Build URL with proper encoding
-    import urllib.parse
-    
-    params = {
-        'client_id': client_id,
-        'redirect_uri': redirect_uri,
-        'response_type': 'code',
-        'scope': ' '.join(scopes),
-        'access_type': 'offline',
-        'prompt': 'consent'
-    }
-    
-    auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
-    
-    return auth_url
+    return redirect(auth_url)
+
 
 @app.route('/gmail/callback')
 @login_required
@@ -677,18 +631,15 @@ def gmail_callback():
         flash('No authorization code received', 'error')
         return redirect(url_for('settings_page'))
     
-    # Exchange code for tokens
     tokens = exchange_code_for_tokens(code)
     
     if not tokens:
         flash('Failed to get access token', 'error')
         return redirect(url_for('settings_page'))
     
-    # Save tokens
     current_user.gmail_token = tokens.get('access_token', '')
     current_user.gmail_refresh_token = tokens.get('refresh_token', '')
     
-    # Get user's Gmail address
     try:
         import requests
         headers = {'Authorization': f'Bearer {tokens["access_token"]}'}
@@ -735,7 +686,6 @@ def gmail_scan():
         return redirect(url_for('settings_page'))
     
     try:
-        # Get emails
         results = service.users().messages().list(
             userId='me',
             labelIds=['INBOX'],
@@ -825,7 +775,6 @@ def gmail_analyze_message(msg_id):
             'body': body
         })
         
-        # Save to history
         entry = AnalysisHistory(
             user_id=current_user.id,
             sender=sender[:200] if sender else 'Unknown',
