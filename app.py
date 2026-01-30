@@ -31,8 +31,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Google OAuth Configuration
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+# Google OAuth Configuration (strip removes any extra spaces/newlines)
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -621,16 +622,45 @@ def profile_page():
 
 @app.route('/gmail/connect')
 @login_required
-def gmail_connect():
-    """Start Gmail OAuth flow"""
-    auth_url = get_gmail_auth_url()
+def get_gmail_auth_url():
+    """Generate Google OAuth URL"""
+    # Clean the client ID (remove any whitespace/newlines)
+    client_id = GOOGLE_CLIENT_ID.strip().replace('\n', '').replace('\r', '')
     
-    if not auth_url:
-        flash('Gmail integration not configured. Please contact admin.', 'error')
-        return redirect(url_for('settings_page'))
+    if not client_id:
+        return None
     
-    return redirect(auth_url)
-
+    # Determine redirect URI based on environment
+    if os.environ.get('RENDER'):
+        redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 
+            'https://phishguard-ai-g6iu.onrender.com/gmail/callback')
+    else:
+        redirect_uri = 'http://127.0.0.1:5000/gmail/callback'
+    
+    # Clean the redirect URI
+    redirect_uri = redirect_uri.strip().replace('\n', '').replace('\r', '')
+    
+    scopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.modify',
+        'https://www.googleapis.com/auth/userinfo.email'
+    ]
+    
+    # Build URL with proper encoding
+    import urllib.parse
+    
+    params = {
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': ' '.join(scopes),
+        'access_type': 'offline',
+        'prompt': 'consent'
+    }
+    
+    auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
+    
+    return auth_url
 
 @app.route('/gmail/callback')
 @login_required
