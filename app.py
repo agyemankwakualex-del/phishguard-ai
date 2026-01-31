@@ -137,16 +137,17 @@ Perform a deep analysis looking for:
 3. Malicious content (suspicious links, credential harvesting)
 4. Language patterns (poor grammar, generic greetings)
 
-Respond in strictly valid JSON format:
+Respond in strictly valid JSON format only:
 {{
     "risk_level": "HIGH" | "MEDIUM" | "LOW",
     "risk_score": <integer 0-100>,
     "is_phishing": <boolean>,
     "reasons": [
-        "Specific reason 1 (e.g. 'Sender domain @paypal-support.com impersonates PayPal')",
-        "Specific reason 2 (e.g. 'Urgency tactic: threatens account suspension in 24h')"
+        "Detailed Reason 1 (e.g. 'Sender domain @paypal-support.com impersonates PayPal')",
+        "Detailed Reason 2 (e.g. 'Urgency tactic: threatens account suspension in 24h')",
+        "Detailed Reason 3"
     ],
-    "recommendation": "Clear, actionable advice for the user"
+    "recommendation": "Clear, actionable advice for the user (e.g., 'Do not click links. Report as spam.')"
 }}"""
 
             response = client.chat.completions.create(

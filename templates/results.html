@@ -5,13 +5,14 @@
 {% block page_title %}Analysis Results{% endblock %}
 
 {% block header_actions %}
-<button onclick="exportPDF()" class="btn btn-secondary">
+<!-- This is the Export Button -->
+<button onclick="exportPDF()" class="action-button secondary" style="width: auto; padding: 8px 16px;">
     📄 Export PDF
 </button>
 {% endblock %}
 
 {% block content %}
-<div class="results-container" id="report-content">
+<div id="report-content">
     <!-- Risk Header -->
     <div class="risk-header risk-{{ result.risk_level|lower }}">
         <div class="risk-badge-large">
@@ -121,6 +122,7 @@
     {% endif %}
 </div>
 
+<!-- Bottom Actions -->
 <div class="results-actions">
     <a href="{{ url_for('analyze_page') }}" class="action-button primary">
         🔍 Analyze Another Email
@@ -130,17 +132,28 @@
     </a>
 </div>
 
+<!-- PDF Script -->
 <script>
 function exportPDF() {
     const element = document.getElementById('report-content');
     const opt = {
-        margin: 1,
+        margin: 0.5,
         filename: 'PhishGuard_Report.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2 },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
-    html2pdf().set(opt).from(element).save();
+    
+    // Add loading state
+    const btn = document.querySelector('button[onclick="exportPDF()"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Generating...';
+    btn.disabled = true;
+    
+    html2pdf().set(opt).from(element).save().then(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
 }
 </script>
 {% endblock %}
