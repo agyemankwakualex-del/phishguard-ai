@@ -1,11 +1,18 @@
 {% extends "base.html" %}
 
 {% block title %}Analysis Results - PhishGuard AI{% endblock %}
+{% block page_icon %}🔍{% endblock %}
 {% block page_title %}Analysis Results{% endblock %}
 
+{% block header_actions %}
+<button onclick="exportPDF()" class="btn btn-secondary">
+    📄 Export PDF
+</button>
+{% endblock %}
+
 {% block content %}
-<div class="results-container">
-    <!-- Risk Level Header -->
+<div class="results-container" id="report-content">
+    <!-- Risk Header -->
     <div class="risk-header risk-{{ result.risk_level|lower }}">
         <div class="risk-badge-large">
             {% if result.risk_level == 'HIGH' %}
@@ -44,6 +51,10 @@
                     <label>Subject:</label>
                     <span>{{ email.subject or 'Not provided' }}</span>
                 </div>
+                <div class="info-item">
+                    <label>Date:</label>
+                    <span>{{ email.date or 'Today' }}</span>
+                </div>
             </div>
         </div>
     </div>
@@ -51,7 +62,7 @@
     <!-- Analysis Results -->
     <div class="card">
         <div class="card-header">
-            <h3>🔍 Why This Email Was Flagged</h3>
+            <h3>🔍 Detailed Analysis</h3>
         </div>
         <div class="card-body">
             <ul class="reasons-list">
@@ -85,7 +96,7 @@
     {% if links %}
     <div class="card">
         <div class="card-header">
-            <h3>🔗 Links Found in Email ({{ links|length }})</h3>
+            <h3>🔗 Links Analysis ({{ links|length }})</h3>
         </div>
         <div class="card-body">
             <div class="links-list">
@@ -96,7 +107,7 @@
                         {% if lr.url == link %}
                         <div class="link-status status-{{ lr.risk|lower }}">
                             {% if lr.risk == 'HIGH' %}🔴 Dangerous
-                            {% elif lr.risk == 'MEDIUM' %}🟡 Suspicious
+                            {% elif lr.risk == 'MEDIUM' %}🟡 Suspicious  
                             {% elif lr.risk == 'LOW' %}🟢 Safe
                             {% else %}❓ Unknown{% endif %}
                         </div>
@@ -105,24 +116,31 @@
                 </div>
                 {% endfor %}
             </div>
-            
-            {% if not link_results %}
-            <p class="muted-text">
-                <small>Add VirusTotal API key in Settings to check links automatically.</small>
-            </p>
-            {% endif %}
         </div>
     </div>
     {% endif %}
-    
-    <!-- Actions -->
-    <div class="results-actions">
-        <a href="{{ url_for('analyze_page') }}" class="action-button primary">
-            🔍 Analyze Another Email
-        </a>
-        <a href="{{ url_for('home') }}" class="action-button secondary">
-            📊 Back to Dashboard
-        </a>
-    </div>
 </div>
+
+<div class="results-actions">
+    <a href="{{ url_for('analyze_page') }}" class="action-button primary">
+        🔍 Analyze Another Email
+    </a>
+    <a href="{{ url_for('home') }}" class="action-button secondary">
+        📊 Back to Dashboard
+    </a>
+</div>
+
+<script>
+function exportPDF() {
+    const element = document.getElementById('report-content');
+    const opt = {
+        margin: 1,
+        filename: 'PhishGuard_Report.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+</script>
 {% endblock %}

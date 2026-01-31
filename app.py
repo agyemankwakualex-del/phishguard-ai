@@ -122,19 +122,31 @@ class PhishingAnalyzer:
             from groq import Groq
             client = Groq(api_key=self.groq_api_key)
             
-            prompt = f"""Analyze this email for phishing indicators.
+            prompt = f"""You are PhishGuard AI, an elite cybersecurity expert. Analyze this email for phishing, social engineering, and fraud.
 
+EMAIL METADATA:
 FROM: {email_data.get('sender', 'Unknown')}
 SUBJECT: {email_data.get('subject', '')}
-BODY: {email_data.get('body', '')[:1500]}
 
-Respond in JSON format only:
+EMAIL BODY:
+{email_data.get('body', '')[:2000]}
+
+Perform a deep analysis looking for:
+1. Header anomalies (mismatched domains, spoofing)
+2. Social engineering (urgency, fear, greed, curiosity)
+3. Malicious content (suspicious links, credential harvesting)
+4. Language patterns (poor grammar, generic greetings)
+
+Respond in strictly valid JSON format:
 {{
-    "risk_level": "HIGH" or "MEDIUM" or "LOW",
-    "risk_score": <0-100>,
-    "is_phishing": true or false,
-    "reasons": ["reason1", "reason2"],
-    "recommendation": "what to do"
+    "risk_level": "HIGH" | "MEDIUM" | "LOW",
+    "risk_score": <integer 0-100>,
+    "is_phishing": <boolean>,
+    "reasons": [
+        "Specific reason 1 (e.g. 'Sender domain @paypal-support.com impersonates PayPal')",
+        "Specific reason 2 (e.g. 'Urgency tactic: threatens account suspension in 24h')"
+    ],
+    "recommendation": "Clear, actionable advice for the user"
 }}"""
 
             response = client.chat.completions.create(
