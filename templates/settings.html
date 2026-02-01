@@ -58,11 +58,18 @@
             </div>
             {% elif config.gmail_available %}
             <div class="gmail-status disconnected">
-                <p>Connect your Gmail to automatically scan your inbox for phishing emails.</p>
-                <a href="{{ url_for('gmail_connect') }}" class="action-button primary">
-                    🔗 Connect Gmail
-                </a>
-            </div>
+    <p>Connect your Gmail to automatically scan your inbox for phishing emails.</p>
+    
+    <!-- ADD THIS NOTE -->
+    <p style="font-size: 0.8rem; color: var(--warning); margin-bottom: 15px; background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 4px;">
+        ⚠️ <strong>Note:</strong> Due to Google Security restrictions, Gmail integration is currently invite-only. 
+        <br>Please contact the admin to whitelist your email address.
+    </p>
+    
+    <a href="{{ url_for('gmail_connect') }}" class="action-button primary">
+        🔗 Connect Gmail
+    </a>
+</div>
             {% else %}
             <div class="gmail-status unavailable">
                 <p>⚠️ Gmail integration is not configured on this server.</p>
