@@ -375,7 +375,7 @@ def profile_page():
 def about_page(): return render_template('about.html')
 
 # ============================================================
-# GMAIL INTEGRATION
+# GMAIL INTEGRATION (Final Fix)
 # ============================================================
 
 @app.route('/gmail/connect')
@@ -386,20 +386,25 @@ def gmail_connect():
         return redirect(url_for('settings_page'))
         
     redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 'http://127.0.0.1:5000/gmail/callback')
-    scope = "https://www.googleapis.com/auth/gmail.readonly"
+    
+    # 1. SCOPES: We ask for BOTH Read-Only Gmail AND User Email Profile
+    scope = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email"
+    
     return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope={scope}&access_type=offline&prompt=consent")
 
 @app.route('/gmail/callback')
 @login_required
 def gmail_callback():
+    # 2. Get the code from the URL
     code = request.args.get('code')
     
-    # 1. Get the Redirect URI from Environment, or fallback to localhost
-    # CRITICAL: This MUST match exactly what is in Google Cloud Console
+    # 3. SAFETY CHECK: If there is no code, stop immediately.
+    if not code:
+        flash('Login failed: No authorization code received from Google. Please try again.', 'error')
+        return redirect(url_for('settings_page'))
+
     redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 'http://127.0.0.1:5000/gmail/callback')
     
-    print(f"DEBUG: Using Redirect URI: {redirect_uri}") # <--- Look for this in Render Logs
-
     data = {
         'code': code, 
         'client_id': GOOGLE_CLIENT_ID, 
@@ -409,7 +414,7 @@ def gmail_callback():
     }
     
     try:
-        # 2. Ask Google for the token
+        # 4. Exchange Code for Token
         r = requests.post('https://oauth2.googleapis.com/token', data=data)
         
         if r.status_code == 200:
@@ -417,23 +422,23 @@ def gmail_callback():
             current_user.gmail_token = tokens['access_token']
             current_user.gmail_refresh_token = tokens.get('refresh_token', current_user.gmail_refresh_token)
             
-            # 3. Fetch Email Address to confirm identity
+            # 5. Get Email Address (Now this works because we added the scope above!)
             user_info = requests.get('https://www.googleapis.com/oauth2/v2/userinfo', headers={'Authorization': f"Bearer {tokens['access_token']}"})
+            
             if user_info.status_code == 200:
                 current_user.gmail_email = user_info.json().get('email')
                 db.session.commit()
-                flash(f'Successfully connected: {current_user.gmail_email}', 'success')
+                flash('Gmail connected successfully!', 'success')
             else:
-                flash('Token received, but failed to fetch email profile.', 'error')
+                flash('Connected, but could not fetch email address.', 'warning')
         else:
-            # 4. PRINT THE ERROR IF IT FAILS
-            error_details = r.text
-            print(f"GOOGLE OAUTH ERROR: {error_details}") # <--- Check Render Logs for this
-            flash(f'Google Login Failed. Server responded: {r.status_code}', 'error')
+            # Log the actual error from Google for debugging
+            print(f"GOOGLE ERROR: {r.text}")
+            flash('Failed to connect to Google.', 'error')
             
     except Exception as e:
-        print(f"EXCEPTION: {e}")
-        flash(f'Connection error: {str(e)}', 'error')
+        print(f"CONNECTION ERROR: {e}")
+        flash('System error during connection.', 'error')
         
     return redirect(url_for('settings_page'))
 
