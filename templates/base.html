@@ -11,17 +11,25 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+                <!-- Sidebar -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <span class="logo-icon">🛡️</span>
+                    <!-- LOGO CHANGE: Use image if available, else emoji -->
+                    <!-- Make sure to put your logo.png in static/css/ or static/images/ -->
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" 
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" 
+                         alt="PhishGuard" style="height: 40px; width: auto;">
+                    <span class="logo-icon" style="display:none; font-size: 2rem;">🛡️</span>
+                    
                     <div class="logo-text">
                         <h1>PhishGuard AI</h1>
-                        <p>Email Security</p>
+                        <p>Cyber Defense</p>
                     </div>
                 </div>
             </div>
+            
+            <!-- (Rest of menu remains the same...) -->
             
                         <ul class="nav-menu">
                 <li class="nav-item">

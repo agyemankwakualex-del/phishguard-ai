@@ -1,159 +1,106 @@
 {% extends "base.html" %}
 
-{% block title %}Analysis Results - PhishGuard AI{% endblock %}
-{% block page_icon %}🔍{% endblock %}
-{% block page_title %}Analysis Results{% endblock %}
+{% block title %}Scan Results | PhishGuard{% endblock %}
+{% block page_title %}Scan Report{% endblock %}
 
 {% block header_actions %}
-<!-- This is the Export Button -->
-<button onclick="exportPDF()" class="action-button secondary" style="width: auto; padding: 8px 16px;">
-    📄 Export PDF
+<button onclick="generatePDF()" class="action-button primary">
+    📄 Download PDF Report
 </button>
 {% endblock %}
 
 {% block content %}
-<div id="report-content">
-    <!-- Risk Header -->
-    <div class="risk-header risk-{{ result.risk_level|lower }}">
-        <div class="risk-badge-large">
-            {% if result.risk_level == 'HIGH' %}
-                🔴 HIGH RISK
-            {% elif result.risk_level == 'MEDIUM' %}
-                🟡 MEDIUM RISK
-            {% else %}
-                🟢 LOW RISK
-            {% endif %}
-        </div>
-        <div class="risk-score">
-            <span class="score-number">{{ result.risk_score }}</span>
-            <span class="score-label">/ 100</span>
-        </div>
-        <div class="risk-type">
-            {% if result.ai_powered %}
-                🤖 AI-Powered Analysis
-            {% else %}
-                📋 Rule-Based Analysis
-            {% endif %}
-        </div>
-    </div>
+<div id="pdf-area" style="background: var(--bg-color); padding: 20px;">
     
-    <!-- Email Info -->
-    <div class="card">
-        <div class="card-header">
-            <h3>📧 Email Information</h3>
-        </div>
-        <div class="card-body">
-            <div class="info-grid">
-                <div class="info-item">
-                    <label>From:</label>
-                    <span>{{ email.sender or 'Not provided' }}</span>
-                </div>
-                <div class="info-item">
-                    <label>Subject:</label>
-                    <span>{{ email.subject or 'Not provided' }}</span>
-                </div>
-                <div class="info-item">
-                    <label>Date:</label>
-                    <span>{{ email.date or 'Today' }}</span>
-                </div>
+    <!-- Header for PDF -->
+    <div class="pdf-header" style="display:none; text-align:center; margin-bottom:20px; border-bottom:1px solid #ccc; padding-bottom:10px;">
+        <h1 style="color:#000;">PhishGuard AI Security Report</h1>
+        <p style="color:#666;">Scan Date: {{ email.date or 'Just Now' }}</p>
+    </div>
+
+    <!-- Score Card -->
+    <div class="card" style="border-left: 6px solid {{ 'var(--danger)' if result.risk_level == 'HIGH' else 'var(--warning)' if result.risk_level == 'MEDIUM' else 'var(--success)' }};">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span class="risk-badge risk-{{ result.risk_level }}" style="font-size: 1rem;">VERDICT: {{ result.risk_level }} RISK</span>
+                <h2 style="margin: 10px 0;">Risk Score: {{ result.risk_score }}/100</h2>
+                <p style="color: var(--text-secondary);">
+                    Engine: {{ '🤖 AI + VirusTotal' if result.ai_powered else '📋 Rule-Based' }}
+                </p>
             </div>
         </div>
     </div>
-    
-    <!-- Analysis Results -->
-    <div class="card">
-        <div class="card-header">
-            <h3>🔍 Detailed Analysis</h3>
-        </div>
-        <div class="card-body">
-            <ul class="reasons-list">
+
+    <!-- Details Grid -->
+    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 20px;">
+        
+        <!-- Reasons -->
+        <div class="card">
+            <h3>⚠️ Detected Indicators</h3>
+            <ul style="padding-left: 20px;">
                 {% for reason in result.reasons %}
-                <li class="reason-item">
-                    <span class="reason-icon">
-                        {% if result.risk_level == 'HIGH' %}⚠️
-                        {% elif result.risk_level == 'MEDIUM' %}⚡
-                        {% else %}✓{% endif %}
-                    </span>
-                    <span>{{ reason }}</span>
-                </li>
+                <li style="margin-bottom: 8px;">{{ reason }}</li>
                 {% endfor %}
             </ul>
         </div>
-    </div>
-    
-    <!-- Recommendation -->
-    <div class="card">
-        <div class="card-header">
+
+        <!-- Recommendation -->
+        <div class="card">
             <h3>💡 Recommendation</h3>
+            <p style="font-size: 1.1rem; font-style: italic;">"{{ result.recommendation }}"</p>
         </div>
-        <div class="card-body">
-            <div class="recommendation recommendation-{{ result.risk_level|lower }}">
-                {{ result.recommendation }}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Links Found -->
-    {% if links %}
-    <div class="card">
-        <div class="card-header">
-            <h3>🔗 Links Analysis ({{ links|length }})</h3>
-        </div>
-        <div class="card-body">
-            <div class="links-list">
-                {% for link in links %}
-                <div class="link-item">
-                    <div class="link-url">{{ link[:60] }}{% if link|length > 60 %}...{% endif %}</div>
-                    {% for lr in link_results %}
-                        {% if lr.url == link %}
-                        <div class="link-status status-{{ lr.risk|lower }}">
-                            {% if lr.risk == 'HIGH' %}🔴 Dangerous
-                            {% elif lr.risk == 'MEDIUM' %}🟡 Suspicious  
-                            {% elif lr.risk == 'LOW' %}🟢 Safe
-                            {% else %}❓ Unknown{% endif %}
-                        </div>
-                        {% endif %}
-                    {% endfor %}
+
+        <!-- Links Analysis -->
+        {% if links %}
+        <div class="card">
+            <h3>🔗 Link Safety Check</h3>
+            {% for link_data in link_results %}
+            <div style="margin-bottom: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 4px;">
+                <div style="word-break: break-all; color: var(--accent);">{{ link_data.url }}</div>
+                <div style="margin-top: 5px; font-size: 0.9rem;">
+                    Risk: 
+                    <span style="font-weight: bold; color: {{ 'var(--danger)' if link_data.risk == 'HIGH' else 'var(--success)' }}">
+                        {{ link_data.risk }}
+                    </span>
                 </div>
-                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Original Email Content -->
+        <div class="card">
+            <h3>📧 Analyzed Message</h3>
+            <div style="background: #111; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 0.9rem; color: #ccc; white-space: pre-wrap;">
+<strong style="color:var(--accent)">From:</strong> {{ email.sender }}
+<strong style="color:var(--accent)">Subject:</strong> {{ email.subject }}
+
+{{ email.body }}
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 
-<!-- Bottom Actions -->
-<div class="results-actions">
-    <a href="{{ url_for('analyze_page') }}" class="action-button primary">
-        🔍 Analyze Another Email
-    </a>
-    <a href="{{ url_for('home') }}" class="action-button secondary">
-        📊 Back to Dashboard
-    </a>
-</div>
-
-<!-- PDF Script -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
-function exportPDF() {
-    const element = document.getElementById('report-content');
-    const opt = {
-        margin: 0.5,
-        filename: 'PhishGuard_Report.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    // Add loading state
-    const btn = document.querySelector('button[onclick="exportPDF()"]');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '⏳ Generating...';
-    btn.disabled = true;
-    
-    html2pdf().set(opt).from(element).save().then(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    });
-}
+    function generatePDF() {
+        const element = document.getElementById('pdf-area');
+        
+        // Show PDF header temporarily
+        const header = document.querySelector('.pdf-header');
+        header.style.display = 'block';
+
+        const opt = {
+            margin:       0.5,
+            filename:     'PhishGuard_Scan_Report.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, backgroundColor: '#1e293b' }, // Dark background for PDF
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            header.style.display = 'none';
+        });
+    }
 </script>
 {% endblock %}

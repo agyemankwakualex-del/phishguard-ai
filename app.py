@@ -6,6 +6,7 @@ Includes: Centralized API Keys, VirusTotal, Gmail, and Profile Route
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask import send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import json
@@ -514,6 +515,25 @@ def gmail_analyze_single(msg_id):
         
     except Exception as e:
         return jsonify({'error': str(e)})
-
+@app.route('/site-qr')
+def site_qr():
+    import qrcode
+    from io import BytesIO
+    
+    # URL of your Render site
+    base_url = "https://phishguard-ai-g6iu.onrender.com"
+    
+    # Generate QR
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(base_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Save to buffer
+    buffer = BytesIO()
+    img.save(buffer)
+    buffer.seek(0)
+    
+    return flask.send_file(buffer, mimetype='image/png')
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
