@@ -3,7 +3,7 @@ PhishGuard AI - Final Production Backend
 Includes: Centralized API Keys, VirusTotal, Gmail, and Profile Route
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask import send_file
@@ -16,6 +16,8 @@ import base64
 import urllib.parse
 import hashlib
 import requests
+import qrcode
+from io import BytesIO
 
 # ============================================================
 # APP CONFIGURATION
@@ -505,20 +507,35 @@ def gmail_analyze_single(msg_id):
         headers_dict = {h['name'].lower(): h['value'] for h in header_list}
         body = m_data.get('snippet', '')
         
+        # 1. Run Analysis
         analyzer = PhishingAnalyzer(SYSTEM_GROQ_KEY, SYSTEM_VT_KEY)
         result, _, _ = analyzer.analyze({
             'sender': headers_dict.get('from', ''),
             'subject': headers_dict.get('subject', ''),
             'body': body
         })
+        
+        # 2. SAVE TO DATABASE (This was missing!)
+        entry = AnalysisHistory(
+            user_id=current_user.id, 
+            sender=headers_dict.get('from', 'Unknown')[:200],
+            subject=headers_dict.get('subject', '(No Subject)')[:500], 
+            risk_level=result['risk_level'],
+            risk_score=result['risk_score']
+        )
+        entry.set_reasons(result['reasons'])
+        db.session.add(entry)
+        db.session.commit()
+        
+        # 3. Return result to frontend
         return jsonify(result)
         
     except Exception as e:
         return jsonify({'error': str(e)})
+    
 @app.route('/site-qr')
 def site_qr():
-    import qrcode
-    from io import BytesIO
+
     
     # URL of your Render site
     base_url = "https://phishguard-ai-g6iu.onrender.com"
@@ -534,6 +551,7 @@ def site_qr():
     img.save(buffer)
     buffer.seek(0)
     
-    return flask.send_file(buffer, mimetype='image/png')
+    # FIX: Use 'send_file' directly, not 'flask.send_file'
+    return send_file(buffer, mimetype='image/png')
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
