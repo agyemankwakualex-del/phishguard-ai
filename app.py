@@ -26,8 +26,10 @@ from io import BytesIO
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 
-# Database Config
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db')
+# Database Config (Handles Render PostgreSQL or Local SQLite)
+# .strip() removes accidental newlines/spaces from copy-pasting
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db').strip()
+
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
