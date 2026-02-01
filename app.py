@@ -393,29 +393,47 @@ def gmail_connect():
 @login_required
 def gmail_callback():
     code = request.args.get('code')
+    
+    # 1. Get the Redirect URI from Environment, or fallback to localhost
+    # CRITICAL: This MUST match exactly what is in Google Cloud Console
     redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 'http://127.0.0.1:5000/gmail/callback')
+    
+    print(f"DEBUG: Using Redirect URI: {redirect_uri}") # <--- Look for this in Render Logs
+
     data = {
-        'code': code, 'client_id': GOOGLE_CLIENT_ID, 'client_secret': GOOGLE_CLIENT_SECRET,
-        'redirect_uri': redirect_uri, 'grant_type': 'authorization_code'
+        'code': code, 
+        'client_id': GOOGLE_CLIENT_ID, 
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'redirect_uri': redirect_uri, 
+        'grant_type': 'authorization_code'
     }
+    
     try:
+        # 2. Ask Google for the token
         r = requests.post('https://oauth2.googleapis.com/token', data=data)
+        
         if r.status_code == 200:
             tokens = r.json()
             current_user.gmail_token = tokens['access_token']
             current_user.gmail_refresh_token = tokens.get('refresh_token', current_user.gmail_refresh_token)
             
-            # Fetch Email Address
+            # 3. Fetch Email Address to confirm identity
             user_info = requests.get('https://www.googleapis.com/oauth2/v2/userinfo', headers={'Authorization': f"Bearer {tokens['access_token']}"})
             if user_info.status_code == 200:
                 current_user.gmail_email = user_info.json().get('email')
-            
-            db.session.commit()
-            flash('Gmail connected successfully!', 'success')
+                db.session.commit()
+                flash(f'Successfully connected: {current_user.gmail_email}', 'success')
+            else:
+                flash('Token received, but failed to fetch email profile.', 'error')
         else:
-            flash('Failed to retrieve Gmail token.', 'error')
+            # 4. PRINT THE ERROR IF IT FAILS
+            error_details = r.text
+            print(f"GOOGLE OAUTH ERROR: {error_details}") # <--- Check Render Logs for this
+            flash(f'Google Login Failed. Server responded: {r.status_code}', 'error')
+            
     except Exception as e:
-        flash(f'Connection error: {e}', 'error')
+        print(f"EXCEPTION: {e}")
+        flash(f'Connection error: {str(e)}', 'error')
         
     return redirect(url_for('settings_page'))
 
