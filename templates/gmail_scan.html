@@ -1,211 +1,152 @@
 {% extends "base.html" %}
 
 {% block title %}Gmail Scan - PhishGuard AI{% endblock %}
+{% block page_icon %}📧{% endblock %}
 {% block page_title %}Gmail Inbox{% endblock %}
 
 {% block content %}
 <div class="gmail-container">
     <div class="card">
         <div class="card-header">
-            <h3>📧 Your Gmail Inbox</h3>
-            <span class="gmail-badge">{{ current_user.gmail_email }}</span>
+            <h3>
+                <span class="status-icon">✅</span>
+                Connected: {{ current_user.gmail_email }}
+            </h3>
+            <div class="header-actions">
+                <button onclick="analyzeSelected()" class="btn btn-primary" id="btn-scan-all" disabled>
+                    ⚡ Analyze Selected (<span id="count">0</span>)
+                </button>
+            </div>
         </div>
         <div class="card-body">
             {% if emails %}
-            <p class="scan-info">Found {{ emails|length }} emails. Click "Analyze" to check for phishing.</p>
-            
             <div class="email-list">
+                <div class="list-header">
+                    <label class="checkbox-label">
+                        <input type="checkbox" onchange="toggleAll(this)"> Select All
+                    </label>
+                </div>
+                
                 {% for email in emails %}
                 <div class="email-item" id="email-{{ email.id }}">
-                    <div class="email-main">
-                        <div class="email-header">
-                            <span class="email-sender">{{ email.sender }}</span>
-                            <span class="email-date">{{ email.date }}</span>
-                        </div>
-                        <div class="email-subject">{{ email.subject }}</div>
-                        <div class="email-preview">{{ email.body[:150] }}...</div>
+                    <div class="email-check">
+                        <input type="checkbox" class="email-checkbox" value="{{ email.id }}" onchange="updateCount()">
                     </div>
-                    <div class="email-actions">
-                        <button class="btn-analyze" onclick="analyzeEmail('{{ email.id }}', this)">
-                            🔍 Analyze
-                        </button>
-                        <div class="result-area" id="result-{{ email.id }}"></div>
+                    <div class="email-content">
+                        <div class="email-top">
+                            <span class="sender">{{ email.sender }}</span>
+                            <span class="date">{{ email.date }}</span>
+                        </div>
+                        <div class="subject">{{ email.subject }}</div>
+                        <div class="preview">{{ email.body }}...</div>
+                    </div>
+                    <div class="email-status" id="status-{{ email.id }}">
+                        <span class="badge badge-gray">Not Scanned</span>
                     </div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
             <div class="empty-state">
-                <span class="empty-icon">📭</span>
-                <p>No emails found in your inbox</p>
+                <p>No emails found in inbox.</p>
             </div>
             {% endif %}
         </div>
     </div>
-    
-    <div class="action-buttons">
-        <a href="{{ url_for('gmail_scan') }}" class="action-button secondary">🔄 Refresh</a>
-        <a href="{{ url_for('home') }}" class="action-button secondary">📊 Dashboard</a>
-    </div>
 </div>
 
 <style>
-.gmail-container {
-    max-width: 900px;
-}
-
-.gmail-badge {
-    background: #3498db;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-}
-
-.scan-info {
-    color: #6c757d;
-    margin-bottom: 20px;
-}
-
-.email-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.list-header {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 10px;
 }
 
 .email-item {
-    background: rgba(255,255,255,0.05);
-    border-radius: 8px;
-    padding: 16px;
-    border-left: 4px solid #3498db;
-}
-
-.email-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.email-sender {
-    font-weight: 600;
-    color: #fff;
-}
-
-.email-date {
-    color: #6c757d;
-    font-size: 12px;
-}
-
-.email-subject {
-    font-size: 14px;
-    margin-bottom: 8px;
-    color: #e0e0e0;
-}
-
-.email-preview {
-    font-size: 13px;
-    color: #888;
-    line-height: 1.4;
-}
-
-.email-actions {
-    margin-top: 12px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 15px;
+    padding: 15px;
+    background: var(--bg-hover);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.2s;
 }
 
-.btn-analyze {
-    background: #3498db;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-}
-
-.btn-analyze:hover {
-    background: #2980b9;
-}
-
-.btn-analyze:disabled {
-    background: #555;
-    cursor: not-allowed;
-}
-
-.result-area {
+.email-content {
     flex: 1;
 }
 
-.risk-badge {
-    display: inline-block;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.risk-high { background: #e74c3c; color: white; }
-.risk-medium { background: #f39c12; color: white; }
-.risk-low { background: #27ae60; color: white; }
-
-.action-buttons {
+.email-top {
     display: flex;
-    gap: 12px;
-    margin-top: 20px;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
 }
 
-.loading-text {
-    color: #3498db;
-    font-size: 13px;
-}
+.sender { font-weight: 700; color: var(--text-primary); }
+.subject { font-weight: 600; margin-bottom: 4px; }
+.preview { font-size: 12px; color: var(--text-secondary); }
 
-.error-text {
-    color: #e74c3c;
-    font-size: 13px;
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
 }
+.badge-gray { background: #444; color: #ccc; }
+.badge-red { background: var(--danger); color: white; }
+.badge-orange { background: var(--warning); color: white; }
+.badge-green { background: var(--success); color: white; }
 </style>
 
 <script>
-function analyzeEmail(msgId, btn) {
-    const resultArea = document.getElementById('result-' + msgId);
+function toggleAll(source) {
+    const checkboxes = document.querySelectorAll('.email-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+    updateCount();
+}
+
+function updateCount() {
+    const count = document.querySelectorAll('.email-checkbox:checked').length;
+    document.getElementById('count').innerText = count;
+    document.getElementById('btn-scan-all').disabled = count === 0;
+}
+
+async function analyzeSelected() {
+    const selected = Array.from(document.querySelectorAll('.email-checkbox:checked'));
+    const btn = document.getElementById('btn-scan-all');
     
     btn.disabled = true;
-    btn.textContent = '⏳ Analyzing...';
-    resultArea.innerHTML = '<span class="loading-text">Checking for phishing...</span>';
+    btn.innerText = 'Scanning...';
     
-    fetch('/gmail/analyze/' + msgId)
-        .then(response => response.json())
-        .then(data => {
-            btn.disabled = false;
-            btn.textContent = '🔍 Analyze';
+    for (const cb of selected) {
+        const id = cb.value;
+        const statusDiv = document.getElementById(`status-${id}`);
+        statusDiv.innerHTML = '<span class="badge badge-gray">⏳ Scanning...</span>';
+        
+        try {
+            const res = await fetch(`/gmail/analyze/${id}`);
+            const data = await res.json();
             
             if (data.error) {
-                resultArea.innerHTML = '<span class="error-text">Error: ' + data.error + '</span>';
+                statusDiv.innerHTML = '<span class="badge badge-gray">Error</span>';
             } else {
-                const riskClass = 'risk-' + data.risk_level.toLowerCase();
-                resultArea.innerHTML = `
-                    <span class="risk-badge ${riskClass}">
-                        ${data.risk_level} RISK (${data.risk_score}/100)
-                    </span>
-                `;
+                let color = 'green';
+                if (data.risk_level === 'HIGH') color = 'red';
+                if (data.risk_level === 'MEDIUM') color = 'orange';
                 
-                // Update border color based on risk
-                const emailItem = document.getElementById('email-' + msgId);
-                if (data.risk_level === 'HIGH') {
-                    emailItem.style.borderLeftColor = '#e74c3c';
-                } else if (data.risk_level === 'MEDIUM') {
-                    emailItem.style.borderLeftColor = '#f39c12';
-                } else {
-                    emailItem.style.borderLeftColor = '#27ae60';
-                }
+                statusDiv.innerHTML = `<span class="badge badge-${color}">${data.risk_level} (${data.risk_score})</span>`;
             }
-        })
-        .catch(error => {
-            btn.disabled = false;
-            btn.textContent = '🔍 Analyze';
-            resultArea.innerHTML = '<span class="error-text">Failed to analyze</span>';
-        });
+        } catch (e) {
+            statusDiv.innerHTML = '<span class="badge badge-gray">Failed</span>';
+        }
+    }
+    
+    btn.disabled = false;
+    btn.innerText = '⚡ Analyze Selected';
+    updateCount();
 }
 </script>
 {% endblock %}
