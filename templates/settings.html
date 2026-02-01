@@ -5,9 +5,32 @@
 
 {% block content %}
 <div class="settings-container">
-    {% if message %}
-    <div class="alert alert-success">✅ {{ message }}</div>
-    {% endif %}
+    
+    <!-- System Status (Replaces API Key Form) -->
+    <div class="card">
+        <div class="card-header">
+            <h3>🤖 System Status</h3>
+        </div>
+        <div class="card-body">
+            <div class="gmail-status connected" style="background: rgba(30, 41, 59, 0.5);">
+                <div class="status-info">
+                    <span class="status-icon">✨</span>
+                    <div>
+                        <strong>PhishGuard Pro</strong>
+                        <p>Managed API Access Active</p>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 10px;">
+                    <span class="badge" style="background: {{ 'var(--success)' if config.groq_active else 'var(--danger)' }}; padding: 5px 10px; border-radius: 4px; color: white;">
+                        {{ '✓ AI Engine Online' if config.groq_active else '⚠ AI Config Missing' }}
+                    </span>
+                    <span class="badge" style="background: {{ 'var(--success)' if config.vt_active else 'var(--danger)' }}; padding: 5px 10px; border-radius: 4px; color: white;">
+                        {{ '✓ Virus Scanner Online' if config.vt_active else '⚠ Scanner Config Missing' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Gmail Connection -->
     <div class="card">
@@ -47,93 +70,17 @@
             {% endif %}
         </div>
     </div>
-    
-    <!-- API Keys -->
-    <div class="card">
-        <div class="card-header">
-            <h3>🔑 API Configuration</h3>
-        </div>
-        <div class="card-body">
-            <form method="POST">
-                <div class="form-group">
-                    <label>
-                        Groq API Key
-                        {% if config.groq_configured %}
-                        <span class="status-badge success">✓ Configured</span>
-                        {% endif %}
-                    </label>
-                    <input type="password" name="groq_api_key" 
-                           placeholder="Enter Groq API key" class="form-input">
-                    <small><a href="https://console.groq.com" target="_blank">Get free key →</a></small>
-                </div>
-                
-                <div class="form-group">
-                    <label>
-                        VirusTotal API Key
-                        {% if config.virustotal_configured %}
-                        <span class="status-badge success">✓ Configured</span>
-                        {% endif %}
-                    </label>
-                    <input type="password" name="virustotal_api_key" 
-                           placeholder="Enter VirusTotal API key" class="form-input">
-                    <small><a href="https://www.virustotal.com" target="_blank">Get free key →</a></small>
-                </div>
-                
-                <button type="submit" class="submit-button">💾 Save Settings</button>
-            </form>
-        </div>
-    </div>
 </div>
 
 <style>
-.gmail-status {
-    padding: 20px;
-    border-radius: 8px;
-}
-
-.gmail-status.connected {
-    background: rgba(39, 174, 96, 0.1);
-}
-
-.gmail-status.disconnected {
-    text-align: center;
-    padding: 30px;
-}
-
-.gmail-status.unavailable {
-    background: rgba(243, 156, 18, 0.1);
-    padding: 20px;
-    text-align: center;
-}
-
-.status-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.status-icon {
-    font-size: 28px;
-}
-
-.status-info p {
-    color: #888;
-    margin: 4px 0 0 0;
-    font-size: 14px;
-}
-
-.gmail-actions {
-    display: flex;
-    gap: 12px;
-}
-
-.action-button.danger {
-    background: #e74c3c;
-}
-
-.action-button.danger:hover {
-    background: #c0392b;
-}
+.gmail-status { padding: 20px; border-radius: 8px; }
+.gmail-status.connected { background: rgba(39, 174, 96, 0.1); }
+.gmail-status.disconnected { text-align: center; padding: 30px; }
+.gmail-status.unavailable { background: rgba(243, 156, 18, 0.1); padding: 20px; text-align: center; }
+.status-info { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.status-icon { font-size: 28px; }
+.status-info p { color: #888; margin: 4px 0 0 0; font-size: 14px; }
+.gmail-actions { display: flex; gap: 12px; }
+.action-button.danger { background: #e74c3c; }
 </style>
 {% endblock %}
