@@ -77,11 +77,14 @@
             <!-- User Menu -->
             <div class="user-menu">
                 <div class="user-info">
-                    <img src="{{ current_user.avatar(36) }}" alt="Avatar" class="user-avatar-img">
-                    <div class="user-details">
-                        <span class="user-name">{{ current_user.username }}</span>
-                        <span class="user-email">{{ current_user.email[:15] }}...</span>
-                    </div>
+                    <!-- Wrapped in Link -->
+                    <a href="{{ url_for('profile_page') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
+                        <img src="{{ current_user.avatar(36) }}" alt="Avatar" class="user-avatar-img" style="cursor: pointer; transition: transform 0.2s;">
+                        <div class="user-details">
+                            <span class="user-name">{{ current_user.username }}</span>
+                            <span class="user-email" style="font-size: 0.7rem;">{{ current_user.email[:15] }}...</span>
+                        </div>
+                    </a>
                 </div>
                 <div class="user-actions">
                     <a href="{{ url_for('profile_page') }}" class="user-link">Profile</a>

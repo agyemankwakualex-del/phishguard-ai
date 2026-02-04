@@ -91,19 +91,20 @@
         <div class="card-body">
             {% if recent_threats %}
                 {% for threat in recent_threats %}
-                <div class="threat-item">
-                    <!-- FIXED: Dynamic class based on risk level -->
+                <!-- Wrap in link to view detail -->
+                <a href="{{ url_for('view_analysis', id=threat.id) }}" class="threat-item" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 1rem; padding: 10px; border-bottom: 1px solid var(--border); transition: background 0.2s;">
                     <div class="threat-badge {{ threat.risk_level|lower }}">{{ threat.risk_level }}</div>
-                    <div class="threat-info">
+                    <div class="threat-info" style="flex: 1;">
                         <strong>
                             {{ threat.sender[:30] }}{% if threat.sender|length > 30 %}...{% endif %}
                         </strong>
-                        <p>
+                        <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">
                             {{ threat.subject[:40] }}{% if threat.subject|length > 40 %}...{% endif %}
                         </p>
-                        <small>{{ threat.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                        <small style="font-size: 0.75rem; color: var(--text-secondary);">{{ threat.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
                     </div>
-                </div>
+                    <div><i class="fas fa-chevron-right" style="color: var(--text-secondary);"></i></div>
+                </a>
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
@@ -194,16 +195,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+        // Activity Chart (Real-Time Data)
     const activityCtx = document.getElementById('activityChart');
     if (activityCtx) {
         new Chart(activityCtx.getContext('2d'), {
             type: 'bar',
             data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                labels: {{ chart_labels | tojson }}, // Dynamic Labels (Mon, Tue...)
                 datasets: [{
                     label: 'Emails Scanned',
-                    data: [12, 19, 3, 5, 2, 3, 7], // In a real app, calculate these from DB
-                    backgroundColor: '#3498db',
+                    data: {{ chart_data | tojson }}, // Dynamic Data
+                    backgroundColor: '#3b82f6',
                     borderRadius: 4,
                     barThickness: 20
                 }]
@@ -215,11 +217,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     y: {
                         beginAtZero: true,
                         grid: { color: 'rgba(255,255,255,0.05)' },
-                        ticks: { color: '#a0a0a0' }
+                        ticks: { color: '#94a3b8', stepSize: 1 }
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { color: '#a0a0a0' }
+                        ticks: { color: '#94a3b8' }
                     }
                 },
                 plugins: { legend: { display: false } }

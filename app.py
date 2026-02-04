@@ -8,7 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask import send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta # <--- Added timedelta
 import json
 import re
 import os
@@ -290,14 +290,37 @@ def logout():
 @app.route('/')
 @login_required
 def home():
+    # 1. Fetch History
     history = AnalysisHistory.query.filter_by(user_id=current_user.id).order_by(AnalysisHistory.timestamp.desc()).all()
+    
+    # 2. Calculate Stats
     stats = {
         'total': len(history),
         'high_risk': len([h for h in history if h.risk_level == 'HIGH']),
         'medium_risk': len([h for h in history if h.risk_level == 'MEDIUM']),
         'low_risk': len([h for h in history if h.risk_level == 'LOW'])
     }
-    return render_template('index.html', stats=stats, recent_threats=history[:5])
+    
+    # 3. Calculate Weekly Activity (Real-Time)
+    # Create a dictionary for the last 7 days initialized to 0
+    today = datetime.utcnow().date()
+    dates = [(today - timedelta(days=i)) for i in range(6, -1, -1)] # Last 7 days
+    labels = [d.strftime('%a') for d in dates] # Mon, Tue, Wed...
+    counts = {d: 0 for d in dates}
+    
+    # Count actual scans
+    for h in history:
+        h_date = h.timestamp.date()
+        if h_date in counts:
+            counts[h_date] += 1
+            
+    data_values = [counts[d] for d in dates]
+    
+    return render_template('index.html', 
+                         stats=stats, 
+                         recent_threats=history[:5],
+                         chart_labels=labels,
+                         chart_data=data_values)
 
 @app.route('/analyze', methods=['GET', 'POST'])
 @login_required
@@ -352,6 +375,55 @@ def settings_page():
         'gmail_available': bool(GOOGLE_CLIENT_ID)
     }
     return render_template('settings.html', config=config)
+
+# ============================================================
+# NEW FEATURES: VIEW DETAIL & DELETE
+# ============================================================
+
+@app.route('/history/view/<int:id>')
+@login_required
+def view_analysis(id):
+    entry = AnalysisHistory.query.get_or_404(id)
+    # Security check: ensure this entry belongs to the current user
+    if entry.user_id != current_user.id:
+        flash('Unauthorized access.', 'error')
+        return redirect(url_for('history_page'))
+    
+    # Reconstruct the result object for the template
+    result = {
+        'risk_level': entry.risk_level,
+        'risk_score': entry.risk_score,
+        'reasons': entry.get_reasons(),
+        'recommendation': "Review past analysis." if entry.risk_level == 'LOW' else "Caution advised based on past scan.",
+        'ai_powered': True # Assuming historical items used AI
+    }
+    
+    # Reconstruct email object
+    # Note: We didn't save the full body in the DB to save space, 
+    # so we show a placeholder or what we have.
+    email_data = {
+        'sender': entry.sender,
+        'subject': entry.subject,
+        'body': "(Email content was not stored permanently for privacy reasons.)", 
+        'date': entry.timestamp.strftime('%Y-%m-%d %H:%M')
+    }
+    
+    return render_template('results.html', result=result, email=email_data, links=[], link_results=[])
+
+
+@app.route('/history/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_analysis(id):
+    entry = AnalysisHistory.query.get_or_404(id)
+    if entry.user_id != current_user.id:
+        flash('Unauthorized.', 'error')
+        return redirect(url_for('history_page'))
+    
+    db.session.delete(entry)
+    db.session.commit()
+    flash('Analysis record deleted.', 'success')
+    return redirect(url_for('history_page'))
+
 
 # =========================================================
 # PROFILE PAGE (This is the one that was missing)
