@@ -21,17 +21,17 @@
     --danger: #e74c3c;
     --gradient-start: #3498db;
     --gradient-end: #9b59b6;
-    --e1: 0 4px 16px rgba(0, 0, 0, 0.28);
-    --e2: 0 12px 32px rgba(0, 0, 0, 0.38);
-    --e3: 0 20px 48px rgba(0, 0, 0, 0.48);
-    --glass-bg: rgba(22, 33, 62, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.14);
-    --glass-blur: 16px;
+    --e1: 0 14px 32px rgba(0, 0, 0, 0.5), 0 3px 8px rgba(0, 0, 0, 0.4);
+    --e2: 0 24px 52px rgba(0, 0, 0, 0.58), 0 8px 18px rgba(0, 0, 0, 0.42);
+    --e3: 0 36px 80px rgba(0, 0, 0, 0.68), 0 12px 28px rgba(0, 0, 0, 0.5);
+    --glass-bg: rgba(10, 14, 32, 0.58);
+    --glass-border: rgba(255, 255, 255, 0.28);
+    --glass-blur: 28px;
     --r-sm: 8px;
     --r-md: 12px;
-    --r-lg: 16px;
-    --r-xl: 24px;
-    --glow-accent: 0 0 28px rgba(52, 152, 219, 0.45);
+    --r-lg: 24px;
+    --r-xl: 32px;
+    --glow-accent: 0 0 22px rgba(52, 152, 219, 0.65), 0 0 48px rgba(155, 89, 182, 0.45);
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --dur: 200ms;
 }
@@ -46,12 +46,12 @@
     --text-secondary: #555555;
     --text-muted: #888888;
     --border-color: rgba(0, 0, 0, 0.1);
-    --e1: 0 4px 16px rgba(15, 23, 42, 0.08);
-    --e2: 0 12px 32px rgba(15, 23, 42, 0.12);
-    --e3: 0 20px 48px rgba(15, 23, 42, 0.16);
-    --glass-bg: rgba(255, 255, 255, 0.72);
-    --glass-border: rgba(0, 0, 0, 0.08);
-    --glow-accent: 0 0 28px rgba(52, 152, 219, 0.28);
+    --e1: 0 14px 28px rgba(15, 23, 42, 0.16), 0 3px 8px rgba(15, 23, 42, 0.08);
+    --e2: 0 24px 48px rgba(15, 23, 42, 0.22), 0 8px 16px rgba(15, 23, 42, 0.12);
+    --e3: 0 36px 72px rgba(15, 23, 42, 0.28), 0 12px 24px rgba(15, 23, 42, 0.16);
+    --glass-bg: rgba(255, 255, 255, 0.62);
+    --glass-border: rgba(255, 255, 255, 0.7);
+    --glow-accent: 0 0 22px rgba(52, 152, 219, 0.4), 0 0 48px rgba(155, 89, 182, 0.28);
 }
 
 /* Reset */
@@ -65,8 +65,8 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: var(--bg-primary);
     background-image:
-        radial-gradient(circle at 0% 0%, rgba(52, 152, 219, 0.22), transparent 42%),
-        radial-gradient(circle at 100% 0%, rgba(155, 89, 182, 0.18), transparent 40%);
+        radial-gradient(circle at 0% 0%, rgba(52, 152, 219, 0.48), transparent 46%),
+        radial-gradient(circle at 100% 0%, rgba(155, 89, 182, 0.4), transparent 44%);
     background-attachment: fixed;
     background-repeat: no-repeat;
     color: var(--text-primary);
@@ -100,6 +100,7 @@ a:hover {
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border-right: 1px solid var(--glass-border);
+    box-shadow: 12px 0 40px rgba(0, 0, 0, 0.4);
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -356,10 +357,14 @@ a:hover {
    ============================================================ */
 
 .card {
-    background: var(--bg-card);
+    position: relative;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 28%),
+        var(--bg-card);
     border-radius: var(--r-lg);
     border: 1px solid var(--border-color);
-    box-shadow: var(--e1);
+    border-top-color: rgba(255, 255, 255, 0.5);
+    box-shadow: var(--e1), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     overflow: hidden;
     margin-bottom: 20px;
     transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
@@ -367,7 +372,7 @@ a:hover {
 
 .card:hover {
     transform: translateY(-4px);
-    box-shadow: var(--e2);
+    box-shadow: var(--e3), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .card-header {
@@ -403,11 +408,14 @@ a:hover {
 }
 
 .stat-card {
-    background: var(--bg-card);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 32%),
+        var(--bg-card);
     border-radius: var(--r-lg);
     padding: 24px;
     border: 1px solid var(--border-color);
-    box-shadow: var(--e1);
+    border-top-color: rgba(255, 255, 255, 0.5);
+    box-shadow: var(--e1), inset 0 1px 0 rgba(255, 255, 255, 0.42);
     display: flex;
     align-items: center;
     gap: 16px;
@@ -427,9 +435,13 @@ a:hover {
 }
 
 @media (hover: hover) and (pointer: fine) {
+    .stats-grid {
+        perspective: 1000px;
+    }
+
     .stat-card:hover {
-        transform: perspective(600px) rotateX(4deg) rotateY(-6deg) translateY(-4px);
-        box-shadow: var(--e2);
+        transform: perspective(700px) rotateX(10deg) rotateY(-16deg) translateY(-16px);
+        box-shadow: var(--e3), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 }
 
@@ -513,7 +525,7 @@ a:hover {
 .btn-primary {
     background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
     color: white;
-    box-shadow: var(--e1);
+    box-shadow: var(--glow-accent), var(--e2);
 }
 
 .btn-secondary {
@@ -558,7 +570,7 @@ a:hover {
 .action-button.primary {
     background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
     color: white;
-    box-shadow: var(--e1);
+    box-shadow: var(--glow-accent), var(--e2);
 }
 
 .action-button.secondary {
@@ -642,20 +654,20 @@ a:hover {
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: var(--e1);
+    box-shadow: var(--glow-accent), var(--e2);
     transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
 }
 
 .submit-button:hover {
     transform: translateY(-2px);
-    box-shadow: var(--glow-accent);
+    box-shadow: var(--glow-accent), var(--e3);
 }
 
 .btn:active,
 .action-button:active,
 .submit-button:active {
-    transform: translateY(1px);
-    box-shadow: none;
+    transform: translateY(3px) scale(0.97);
+    box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.45);
 }
 
 /* ============================================================
@@ -1157,8 +1169,8 @@ a:hover {
 .auth-page {
     background-color: var(--bg-primary);
     background-image:
-        radial-gradient(circle at 0% 0%, rgba(52, 152, 219, 0.22), transparent 42%),
-        radial-gradient(circle at 100% 0%, rgba(155, 89, 182, 0.18), transparent 40%);
+        radial-gradient(circle at 0% 0%, rgba(52, 152, 219, 0.48), transparent 46%),
+        radial-gradient(circle at 100% 0%, rgba(155, 89, 182, 0.4), transparent 44%);
     background-attachment: fixed;
     background-repeat: no-repeat;
     min-height: 100vh;
@@ -1174,11 +1186,15 @@ a:hover {
 }
 
 .auth-card {
-    background: var(--bg-card);
-    border-radius: 20px;
+    position: relative;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 26%),
+        var(--bg-card);
+    border-radius: var(--r-xl);
     padding: 40px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-    border: 1px solid var(--border-color);
+    box-shadow: var(--e3), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    border: 1px solid var(--glass-border);
+    border-top-color: rgba(255, 255, 255, 0.62);
 }
 
 .auth-header {
@@ -1558,6 +1574,7 @@ a:hover {
     justify-content: space-between;
     align-items: center;
     border-left: 6px solid var(--success);
+    box-shadow: var(--glow-accent), var(--e2), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .score-card.is-high { border-left-color: var(--danger); }
@@ -1612,8 +1629,11 @@ a:hover {
     .card:hover,
     .stat-card:hover,
     .btn:hover,
+    .btn:active,
     .action-button:hover,
-    .submit-button:hover {
+    .action-button:active,
+    .submit-button:hover,
+    .submit-button:active {
         transform: none !important;
     }
 }
