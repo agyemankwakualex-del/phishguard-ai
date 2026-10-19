@@ -258,8 +258,12 @@ If External Intel says malicious, risk MUST be HIGH."""
 def register():
     if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
+        password = request.form.get('password', '')
+        if password != request.form.get('confirm_password', ''):
+            flash('Passwords do not match.', 'error')
+            return render_template('register.html')
         user = User(username=request.form['username'], email=request.form['email'].lower())
-        user.set_password(request.form['password'])
+        user.set_password(password)
         try:
             db.session.add(user)
             db.session.commit()

@@ -16,8 +16,8 @@
                 <div class="status-info">
                     <span class="status-icon">✨</span>
                     <div>
-                        <strong>PhishGuard Pro</strong>
-                        <p>Managed API Access Active</p>
+                        <strong>API status</strong>
+                        <p>{{ 'Managed API access is active.' if config.groq_active and config.vt_active else 'Managed API access is not active.' }}</p>
                     </div>
                 </div>
                 <div style="display: flex; gap: 1rem; margin-top: 10px;">
