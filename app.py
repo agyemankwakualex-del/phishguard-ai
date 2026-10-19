@@ -28,12 +28,22 @@ from io import BytesIO
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 
-# Database Config (Handles Render PostgreSQL or Local SQLite)
-# .strip() removes accidental newlines/spaces from copy-pasting
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db').strip()
+def normalize_database_url(url):
+    # Scheme prefix only. User, password, host, port, path, and query stay as given.
+    # postgres://, postgresql://, and postgresql+psycopg2:// become postgresql+psycopg://.
+    # postgresql+psycopg:// is already the installed psycopg v3 dialect and is left as-is.
+    # sqlite:// and every other scheme are untouched. .strip() matches the previous call.
+    url = url.strip()
+    return re.sub(
+        r'^postgres(?:ql)?(?:\+psycopg2)?://',
+        'postgresql+psycopg://',
+        url,
+        count=1,
+    )
 
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+# Database Config (Handles Render PostgreSQL or Local SQLite)
+database_url = normalize_database_url(os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db'))
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
