@@ -13,10 +13,12 @@ import json
 import re
 import os
 import base64
+import html
 import urllib.parse
 import hashlib
 import requests
 import qrcode
+from html.parser import HTMLParser
 from io import BytesIO
 
 # ============================================================
@@ -459,6 +461,102 @@ def about_page(): return render_template('about.html')
 # GMAIL INTEGRATION (Final Fix)
 # ============================================================
 
+# Characters of decoded body passed into analysis. History never stores this text.
+GMAIL_BODY_CAP = 100_000
+
+
+def _decode_gmail_data(data):
+    pad = '=' * (-len(data) % 4)
+    raw = base64.urlsafe_b64decode(data + pad)
+    return raw.decode('utf-8', errors='replace')[:GMAIL_BODY_CAP]
+
+
+class _GmailHTMLText(HTMLParser):
+    """Visible text plus http(s) href/src values. Script and style contents are dropped."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self._parts = []
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('script', 'style'):
+            self._skip += 1
+            return
+        if self._skip:
+            return
+        found = {name: html.unescape(value or '') for name, value in attrs}
+        for key in ('href', 'src'):
+            value = found.get(key, '').strip()
+            if value.lower().startswith(('http://', 'https://')):
+                self._parts.append(' ' + value + ' ')
+
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style') and self._skip:
+            self._skip -= 1
+            return
+        if self._skip:
+            return
+        if tag in ('p', 'div', 'br', 'li', 'tr', 'h1', 'h2', 'h3'):
+            self._parts.append('\n')
+
+    def handle_data(self, data):
+        if not self._skip:
+            self._parts.append(data)
+
+    def text(self):
+        return ''.join(self._parts)
+
+
+def _html_to_text(value):
+    parser = _GmailHTMLText()
+    parser.feed(value)
+    parser.close()
+    return parser.text()
+
+
+def _collect_mime_text(part, plain, html_parts):
+    if not isinstance(part, dict):
+        return
+    if sum(len(item) for item in plain) >= GMAIL_BODY_CAP:
+        return
+    mime = str(part.get('mimeType') or '').split(';', 1)[0].strip().lower()
+    data = (part.get('body') or {}).get('data')
+    if data:
+        if mime == 'text/plain':
+            plain.append(_decode_gmail_data(data))
+        elif mime == 'text/html':
+            html_parts.append(_decode_gmail_data(data))
+    for child in part.get('parts') or []:
+        _collect_mime_text(child, plain, html_parts)
+
+
+def gmail_message_body(message):
+    """Capped readable body. Uses the snippet when the MIME body is empty or unreadable."""
+    snippet = (message.get('snippet') or '').strip()
+    try:
+        plain, html_parts = [], []
+        _collect_mime_text(message.get('payload') or {}, plain, html_parts)
+        if any(part.strip() for part in plain):
+            text = '\n'.join(part.strip() for part in plain if part.strip())
+        elif any(part.strip() for part in html_parts):
+            text = _html_to_text('\n'.join(html_parts))
+        else:
+            text = ''
+        text = (text or '').strip() or snippet
+    except Exception:
+        text = snippet
+    return text[:GMAIL_BODY_CAP]
+
+
+def gmail_headers(message):
+    found = {}
+    for item in (message.get('payload') or {}).get('headers') or []:
+        name = str(item.get('name') or '').lower()
+        if name and name not in found:
+            found[name] = item.get('value') or ''
+    return found
+
 @app.route('/gmail/connect')
 @login_required
 def gmail_connect():
@@ -548,20 +646,27 @@ def gmail_scan():
         emails = []
         
         for msg in messages:
-            m_r = requests.get(f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg["id"]}', headers=headers)
-            if m_r.status_code == 200:
+            try:
+                m_r = requests.get(
+                    f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg["id"]}',
+                    headers=headers,
+                    params={'format': 'full'},
+                )
+                if m_r.status_code != 200:
+                    continue
                 m_data = m_r.json()
-                payload = m_data.get('payload', {})
-                header_list = payload.get('headers', [])
-                headers_dict = {h['name'].lower(): h['value'] for h in header_list}
-                
+                headers_dict = gmail_headers(m_data)
+                body = gmail_message_body(m_data)
                 emails.append({
                     'id': msg['id'],
                     'sender': headers_dict.get('from', 'Unknown'),
                     'subject': headers_dict.get('subject', 'No Subject'),
-                    'body': m_data.get('snippet', ''),
+                    'body': (m_data.get('snippet') or body)[:240],
                     'date': headers_dict.get('date', '')[:16]
                 })
+            except Exception as e:
+                print(f'Gmail message skipped: {e}')
+                continue
         
         return render_template('gmail_scan.html', emails=emails)
     except Exception as e:
@@ -576,14 +681,16 @@ def gmail_analyze_single(msg_id):
     
     headers = {'Authorization': f'Bearer {current_user.gmail_token}'}
     try:
-        r = requests.get(f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}', headers=headers)
+        r = requests.get(
+            f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}',
+            headers=headers,
+            params={'format': 'full'},
+        )
         if r.status_code != 200: return jsonify({'error': 'Fetch failed'})
         
         m_data = r.json()
-        payload = m_data.get('payload', {})
-        header_list = payload.get('headers', [])
-        headers_dict = {h['name'].lower(): h['value'] for h in header_list}
-        body = m_data.get('snippet', '')
+        headers_dict = gmail_headers(m_data)
+        body = gmail_message_body(m_data)
         
         # 1. Run Analysis
         analyzer = PhishingAnalyzer(SYSTEM_GROQ_KEY, SYSTEM_VT_KEY)

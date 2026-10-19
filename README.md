@@ -36,6 +36,10 @@ Set these names in the process environment. Leave them unset to boot with rules 
 - `GOOGLE_CLIENT_SECRET`
 - `GMAIL_REDIRECT_URI`
 
+## Gmail
+
+Gmail scanning reads the full message body, not the snippet alone. The inbox list loads up to 15 messages with the `gmail.readonly` scope. Each message is fetched in Gmail `full` format. The body prefers `text/plain` and falls back to `text/html` with tags removed. `http` and `https` links from the HTML are kept, and script and style text are not. Analysis receives at most 100,000 characters of that text, through the same path as paste-to-analyze, so links in the body are checked. The existing limit of 5 URLs still applies. If a message has no readable body, analysis uses the snippet. One message that cannot be read does not stop the scan. The full email body is not stored.
+
 ## Vercel
 
 Set `DATABASE_URL` to the Supabase transaction pooler URL (port 6543). Serverless functions should not open a direct database connection on each request. The name is `DATABASE_URL`. Do not commit the value.
