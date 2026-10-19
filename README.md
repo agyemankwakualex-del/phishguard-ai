@@ -30,6 +30,7 @@ Set these names in the process environment. Leave them unset to boot with rules 
 
 - `SECRET_KEY`
 - `DATABASE_URL`
+- `DATABASE_HOSTADDR`
 - `GROQ_API_KEY`
 - `VIRUSTOTAL_API_KEY`
 - `GOOGLE_CLIENT_ID`
@@ -44,6 +45,8 @@ Gmail scanning reads the full message body, not the snippet alone. The inbox lis
 
 Set `DATABASE_URL` to the Supabase transaction pooler URL (port 6543). Serverless functions should not open a direct database connection on each request. The name is `DATABASE_URL`. Do not commit the value.
 
-Vercel installs from `requirements.txt`. The Postgres driver is `psycopg[binary]`, which is what SQLAlchemy loads for a `postgresql://` URL. There is no UI build step. `python app.py` and the Procfile (`gunicorn app:app`) are unchanged. `api/index.py` is only the serverless import. A `postgres://` URL is rewritten to `postgresql://` before SQLAlchemy sees it.
+`DATABASE_HOSTADDR` is optional. Leave it unset for normal runs, including local SQLite. Set it only when Vercel logs show `Errno 16` inside psycopg `conninfo_attempts` (glibc `getaddrinfo` failing before connect). The value is one current public IPv4 address of the Supabase pooler host. That address can rotate and then needs refreshing. Do not commit a value. For a `postgresql+psycopg` URL the app passes it as a psycopg `hostaddr` connect argument and does not put it in `DATABASE_URL`. Those Postgres URLs also use a `NullPool` and psycopg `prepare_threshold=None` with `connect_timeout=10`. SQLite ignores `DATABASE_HOSTADDR`.
+
+Vercel installs from `requirements.txt`. The Postgres driver is `psycopg[binary]`, which SQLAlchemy loads for a `postgresql+psycopg://` URL. There is no UI build step. `python app.py` and the Procfile (`gunicorn app:app`) are unchanged. `api/index.py` is only the serverless import. `postgres://`, `postgresql://`, and `postgresql+psycopg2://` are rewritten to `postgresql+psycopg://` before SQLAlchemy sees the URL.
 
 For persistence on Vercel, set `DATABASE_URL` to the Supabase pooler URL. A live check still needs Alex's real Supabase project and a Vercel deploy. Local runs with no `DATABASE_URL` still use SQLite.
