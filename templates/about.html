@@ -8,7 +8,7 @@
 <div class="about-container">
     
     <!-- Hero Section -->
-    <div class="card" style="text-align: center; padding: 3rem 1rem;">
+    <div class="card center" style="padding: 3rem 1rem;">
         <div style="font-size: 4rem; margin-bottom: 1rem;">🛡️</div>
         <h2 style="font-size: 2rem; margin-bottom: 1rem; color: var(--text-primary);">PhishGuard AI</h2>
         <p style="font-size: 1.2rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto;">
@@ -25,26 +25,26 @@
                 <h3>✨ Core Capabilities</h3>
             </div>
             <div class="card-body">
-                <ul style="list-style: none; padding: 0;">
-                    <li style="margin-bottom: 1.2rem; display: flex; align-items: start;">
-                        <span style="margin-right: 12px; font-size: 1.2rem;">🤖</span>
+                <ul class="feature-list">
+                    <li class="feature-item">
+                        <span class="feature-icon">🤖</span>
                         <div>
                             <strong>Groq AI Engine</strong>
-                            <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0;">Uses Llama-3 8B for semantic analysis of threat patterns.</p>
+                            <p class="note">Uses Llama-3 8B for semantic analysis of threat patterns.</p>
                         </div>
                     </li>
-                    <li style="margin-bottom: 1.2rem; display: flex; align-items: start;">
-                        <span style="margin-right: 12px; font-size: 1.2rem;">🦠</span>
+                    <li class="feature-item">
+                        <span class="feature-icon">🦠</span>
                         <div>
                             <strong>VirusTotal Integration</strong>
-                            <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0;">Scans extracted URLs against a database of known malware.</p>
+                            <p class="note">Scans extracted URLs against a database of known malware.</p>
                         </div>
                     </li>
-                    <li style="margin-bottom: 1.2rem; display: flex; align-items: start;">
-                        <span style="margin-right: 12px; font-size: 1.2rem;">🔒</span>
+                    <li class="feature-item">
+                        <span class="feature-icon">🔒</span>
                         <div>
-                            <strong>Zero-Retention Privacy</strong>
-                            <p style="font-size: 0.9rem; color: var(--text-secondary); margin: 0;">We analyze your emails in real-time. No data is ever stored in our database.</p>
+                            <strong>What is stored</strong>
+                            <p class="note">Accounts, Gmail tokens, and analysis history are stored. The full email body is not.</p>
                         </div>
                     </li>
                 </ul>
@@ -57,22 +57,22 @@
                 <h3>⚠️ Threat Coverage</h3>
             </div>
             <div class="card-body">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div style="background: var(--bg-color); padding: 1rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 1.5rem;">🎭</div>
-                        <div style="font-size: 0.9rem; font-weight: 600; margin-top: 5px;">Impersonation</div>
+                <div class="coverage-grid">
+                    <div class="coverage-tile">
+                        <div class="coverage-icon">🎭</div>
+                        <div class="coverage-label">Impersonation</div>
                     </div>
-                    <div style="background: var(--bg-color); padding: 1rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 1.5rem;">⏰</div>
-                        <div style="font-size: 0.9rem; font-weight: 600; margin-top: 5px;">Urgency</div>
+                    <div class="coverage-tile">
+                        <div class="coverage-icon">⏰</div>
+                        <div class="coverage-label">Urgency</div>
                     </div>
-                    <div style="background: var(--bg-color); padding: 1rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 1.5rem;">🔗</div>
-                        <div style="font-size: 0.9rem; font-weight: 600; margin-top: 5px;">Malware Links</div>
+                    <div class="coverage-tile">
+                        <div class="coverage-icon">🔗</div>
+                        <div class="coverage-label">Malware Links</div>
                     </div>
-                    <div style="background: var(--bg-color); padding: 1rem; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 1.5rem;">🎣</div>
-                        <div style="font-size: 0.9rem; font-weight: 600; margin-top: 5px;">Credential Theft</div>
+                    <div class="coverage-tile">
+                        <div class="coverage-icon">🎣</div>
+                        <div class="coverage-label">Credential Theft</div>
                     </div>
                 </div>
             </div>
@@ -84,12 +84,12 @@
         <div class="card-header">
             <h3>🛠️ Technical Stack</h3>
         </div>
-        <div class="card-body" style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <span class="badge" style="background: #333; color: white; padding: 5px 10px; border-radius: 4px;">Python Flask</span>
-            <span class="badge" style="background: #f55036; color: white; padding: 5px 10px; border-radius: 4px;">Groq API</span>
-            <span class="badge" style="background: #3949ab; color: white; padding: 5px 10px; border-radius: 4px;">VirusTotal API</span>
-            <span class="badge" style="background: #009688; color: white; padding: 5px 10px; border-radius: 4px;">PostgreSQL</span>
-            <span class="badge" style="background: #795548; color: white; padding: 5px 10px; border-radius: 4px;">SQLAlchemy</span>
+        <div class="card-body chip-row">
+            <span class="badge stack-badge" style="background: #333;">Python Flask</span>
+            <span class="badge stack-badge" style="background: #f55036;">Groq API</span>
+            <span class="badge stack-badge" style="background: #3949ab;">VirusTotal API</span>
+            <span class="badge stack-badge" style="background: #009688;">PostgreSQL</span>
+            <span class="badge stack-badge" style="background: #795548;">SQLAlchemy</span>
         </div>
     </div>
 </div>

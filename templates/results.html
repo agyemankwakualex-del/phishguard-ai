@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Scan Results | PhishGuard{% endblock %}
+{% block title %}Scan Results - PhishGuard AI{% endblock %}
 {% block page_title %}Scan Report{% endblock %}
 
 {% block header_actions %}
@@ -10,70 +10,54 @@
 {% endblock %}
 
 {% block content %}
-<div id="pdf-area" style="background: var(--bg-color); padding: 20px;">
-    
-    <!-- Header for PDF -->
-    <div class="pdf-header" style="display:none; text-align:center; margin-bottom:20px; border-bottom:1px solid #ccc; padding-bottom:10px;">
-        <h1 style="color:#000;">PhishGuard AI Security Report</h1>
-        <p style="color:#666;">Scan Date: {{ email.date or 'Just Now' }}</p>
+<div id="pdf-area" class="pdf-area">
+    <div class="pdf-header">
+        <h1>PhishGuard AI Security Report</h1>
+        <p>Scan Date: {{ email.date or 'Just Now' }}</p>
     </div>
 
-    <!-- Score Card -->
-    <div class="card" style="border-left: 6px solid {{ 'var(--danger)' if result.risk_level == 'HIGH' else 'var(--warning)' if result.risk_level == 'MEDIUM' else 'var(--success)' }};">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <span class="risk-badge risk-{{ result.risk_level }}" style="font-size: 1rem;">VERDICT: {{ result.risk_level }} RISK</span>
-                <h2 style="margin: 10px 0;">Risk Score: {{ result.risk_score }}/100</h2>
-                <p style="color: var(--text-secondary);">
-                    Engine: {{ '🤖 AI + VirusTotal' if result.ai_powered else '📋 Rule-Based' }}
-                </p>
-            </div>
+    <div class="card score-card is-{{ result.risk_level|lower }}">
+        <div>
+            <span class="risk-badge risk-{{ result.risk_level }}">VERDICT: {{ result.risk_level }} RISK</span>
+            <h2>Risk Score: {{ result.risk_score }}/100</h2>
+            <p class="muted">
+                Engine: {{ '🤖 AI + VirusTotal' if result.ai_powered else '📋 Rule-Based' }}
+            </p>
         </div>
     </div>
 
-    <!-- Details Grid -->
-    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 20px;">
-        
-        <!-- Reasons -->
+    <div class="details-grid">
         <div class="card">
             <h3>⚠️ Detected Indicators</h3>
             <ul style="padding-left: 20px;">
                 {% for reason in result.reasons %}
-                <li style="margin-bottom: 8px;">{{ reason }}</li>
+                <li>{{ reason }}</li>
                 {% endfor %}
             </ul>
         </div>
 
-        <!-- Recommendation -->
         <div class="card">
             <h3>💡 Recommendation</h3>
             <p style="font-size: 1.1rem; font-style: italic;">"{{ result.recommendation }}"</p>
         </div>
 
-        <!-- Links Analysis -->
         {% if links %}
         <div class="card">
             <h3>🔗 Link Safety Check</h3>
             {% for link_data in link_results %}
-            <div style="margin-bottom: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 4px;">
-                <div style="word-break: break-all; color: var(--accent);">{{ link_data.url }}</div>
-                <div style="margin-top: 5px; font-size: 0.9rem;">
-                    Risk: 
-                    <span style="font-weight: bold; color: {{ 'var(--danger)' if link_data.risk == 'HIGH' else 'var(--success)' }}">
-                        {{ link_data.risk }}
-                    </span>
-                </div>
+            <div class="link-row">
+                <div>{{ link_data.url }}</div>
+                <div class="risk is-{{ link_data.risk|lower }}">Risk: {{ link_data.risk }}</div>
             </div>
             {% endfor %}
         </div>
         {% endif %}
 
-        <!-- Original Email Content -->
         <div class="card">
             <h3>📧 Analyzed Message</h3>
-            <div style="background: #111; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 0.9rem; color: #ccc; white-space: pre-wrap;">
-<strong style="color:var(--accent)">From:</strong> {{ email.sender }}
-<strong style="color:var(--accent)">Subject:</strong> {{ email.subject }}
+            <div class="email-original">
+<strong>From:</strong> {{ email.sender }}
+<strong>Subject:</strong> {{ email.subject }}
 
 {{ email.body }}
             </div>
@@ -81,21 +65,18 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
     function generatePDF() {
         const element = document.getElementById('pdf-area');
-        
-        // Show PDF header temporarily
         const header = document.querySelector('.pdf-header');
         header.style.display = 'block';
 
         const opt = {
-            margin:       0.5,
-            filename:     'PhishGuard_Scan_Report.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, backgroundColor: '#1e293b' }, // Dark background for PDF
-            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            margin: 0.5,
+            filename: 'PhishGuard_Scan_Report.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, backgroundColor: '#1e293b' },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
 
         html2pdf().set(opt).from(element).save().then(() => {

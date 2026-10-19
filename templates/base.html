@@ -78,11 +78,11 @@
             <div class="user-menu">
                 <div class="user-info">
                     <!-- Wrapped in Link -->
-                    <a href="{{ url_for('profile_page') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
-                        <img src="{{ current_user.avatar(36) }}" alt="Avatar" class="user-avatar-img" style="cursor: pointer; transition: transform 0.2s;">
+                    <a href="{{ url_for('profile_page') }}" class="user-profile-link">
+                        <img src="{{ current_user.avatar(36) }}" alt="Avatar" class="user-avatar-img">
                         <div class="user-details">
                             <span class="user-name">{{ current_user.username }}</span>
-                            <span class="user-email" style="font-size: 0.7rem;">{{ current_user.email[:15] }}...</span>
+                            <span class="user-email">{{ current_user.email[:15] }}...</span>
                         </div>
                     </a>
                 </div>
@@ -129,15 +129,6 @@
             </div>
         </main>
     </div>
-    
-    <style>
-        .user-avatar-img {
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            border: 2px solid var(--accent);
-        }
-    </style>
     
     <script>
         function toggleTheme() {

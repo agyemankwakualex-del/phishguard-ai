@@ -30,14 +30,14 @@
             <h3>📊 Usage Statistics</h3>
         </div>
         <div class="card-body">
-            <div class="stats-mini" style="display: flex; gap: 2rem; justify-content: center; text-align: center;">
+            <div class="stats-mini">
                 <div class="stat-mini-item">
-                    <span class="stat-mini-value" style="font-size: 2rem; font-weight: bold;">{{ current_user.analyses|length }}</span>
-                    <span class="stat-mini-label" style="display: block; color: var(--text-secondary);">Emails Analyzed</span>
+                    <span class="stat-mini-value">{{ current_user.analyses|length }}</span>
+                    <span class="stat-mini-label">Emails Analyzed</span>
                 </div>
                 <div class="stat-mini-item">
-                    <span class="stat-mini-value" style="font-size: 2rem; font-weight: bold;">{{ current_user.created_at.strftime('%b %Y') }}</span>
-                    <span class="stat-mini-label" style="display: block; color: var(--text-secondary);">Member Since</span>
+                    <span class="stat-mini-value">{{ current_user.created_at.strftime('%b %Y') }}</span>
+                    <span class="stat-mini-label">Member Since</span>
                 </div>
             </div>
         </div>
