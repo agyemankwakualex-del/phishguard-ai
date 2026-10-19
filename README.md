@@ -35,3 +35,11 @@ Set these names in the process environment. Leave them unset to boot with rules 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GMAIL_REDIRECT_URI`
+
+## Vercel
+
+A live deploy still needs Alex's Vercel account and his keys. Nothing here was deployed.
+
+Set the same seven environment names in the Vercel project. Vercel installs from `requirements.txt`. There is no UI build step. `python app.py` and the Procfile (`gunicorn app:app`) are unchanged. `api/index.py` is only the serverless import.
+
+SQLite on Vercel is temporary. When `DATABASE_URL` is unset, that entry uses a file under `/tmp`. Accounts and history will not persist there without an external `DATABASE_URL`.
