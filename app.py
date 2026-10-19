@@ -20,6 +20,7 @@ import requests
 import qrcode
 from html.parser import HTMLParser
 from io import BytesIO
+from sqlalchemy.pool import NullPool
 
 # ============================================================
 # APP CONFIGURATION
@@ -42,11 +43,38 @@ def normalize_database_url(url):
     )
 
 
+def engine_options_for_database(scheme, hostaddr):
+    # Only the normalized psycopg v3 scheme. SQLite and other schemes stay on
+    # Flask-SQLAlchemy's default engine. hostaddr is a connect argument, not a URL part.
+    if scheme != 'postgresql+psycopg':
+        return {}
+    addr = hostaddr.strip() if isinstance(hostaddr, str) else ''
+    connect_args = {
+        'prepare_threshold': None,
+        'connect_timeout': 10,
+    }
+    if addr:
+        connect_args['hostaddr'] = addr
+    return {
+        'poolclass': NullPool,
+        'connect_args': connect_args,
+    }
+
+
 # Database Config (Handles Render PostgreSQL or Local SQLite)
 database_url = normalize_database_url(os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db'))
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+_database_hostaddr = os.environ.get('DATABASE_HOSTADDR', '')
+_database_hostaddr = _database_hostaddr.strip() if isinstance(_database_hostaddr, str) else ''
+_engine_options = engine_options_for_database(
+    urllib.parse.urlparse(database_url).scheme,
+    _database_hostaddr,
+)
+if _engine_options:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _engine_options
 
 # SYSTEM-WIDE API KEYS (Loaded from Render Environment)
 SYSTEM_GROQ_KEY = os.environ.get('GROQ_API_KEY', '')
@@ -121,8 +149,11 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 def log_database_target(uri):
-    # Scheme, host, port, and whether DATABASE_URL is set. Never user, password, path, or query.
+    # Scheme, host, port, and whether DATABASE_URL / DATABASE_HOSTADDR are set.
+    # Never user, password, path, query, or the hostaddr value.
     env_set = bool(os.environ.get('DATABASE_URL'))
+    hostaddr_raw = os.environ.get('DATABASE_HOSTADDR', '')
+    hostaddr_set = bool(hostaddr_raw.strip()) if isinstance(hostaddr_raw, str) else False
     try:
         parsed = urllib.parse.urlparse(uri)
         scheme = parsed.scheme if isinstance(parsed.scheme, str) else ''
@@ -146,7 +177,7 @@ def log_database_target(uri):
             print('[phishguard] DATABASE_URL parse failed', flush=True)
         return
     print(
-        f'[phishguard] db scheme={scheme} host={host_text} port={port_text} env_set={env_set}',
+        f'[phishguard] db scheme={scheme} host={host_text} port={port_text} env_set={env_set} hostaddr_set={hostaddr_set}',
         flush=True,
     )
 
