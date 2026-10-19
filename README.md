@@ -38,8 +38,8 @@ Set these names in the process environment. Leave them unset to boot with rules 
 
 ## Vercel
 
-A live deploy still needs Alex's Vercel account and his keys. Nothing here was deployed.
+Set `DATABASE_URL` to the Supabase transaction pooler URL (port 6543). Serverless functions should not open a direct database connection on each request. The name is `DATABASE_URL`. Do not commit the value.
 
-Set the same seven environment names in the Vercel project. Vercel installs from `requirements.txt`. There is no UI build step. `python app.py` and the Procfile (`gunicorn app:app`) are unchanged. `api/index.py` is only the serverless import.
+Vercel installs from `requirements.txt`. The Postgres driver is `psycopg[binary]`, which is what SQLAlchemy loads for a `postgresql://` URL. There is no UI build step. `python app.py` and the Procfile (`gunicorn app:app`) are unchanged. `api/index.py` is only the serverless import. A `postgres://` URL is rewritten to `postgresql://` before SQLAlchemy sees it.
 
-SQLite on Vercel is temporary. When `DATABASE_URL` is unset, that entry uses a file under `/tmp`. Accounts and history will not persist there without an external `DATABASE_URL`.
+For persistence on Vercel, set `DATABASE_URL` to the Supabase pooler URL. A live check still needs Alex's real Supabase project and a Vercel deploy. Local runs with no `DATABASE_URL` still use SQLite.
