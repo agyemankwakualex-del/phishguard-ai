@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Scan Results | PhishGuard{% endblock %}
+{% block title %}Scan Results - PhishGuard AI{% endblock %}
 {% block page_title %}Scan Report{% endblock %}
 
 {% block header_actions %}
@@ -20,7 +20,7 @@
         <div>
             <span class="risk-badge risk-{{ result.risk_level }}">VERDICT: {{ result.risk_level }} RISK</span>
             <h2>Risk Score: {{ result.risk_score }}/100</h2>
-            <p style="color: var(--text-secondary);">
+            <p class="muted">
                 Engine: {{ '🤖 AI + VirusTotal' if result.ai_powered else '📋 Rule-Based' }}
             </p>
         </div>

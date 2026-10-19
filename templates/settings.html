@@ -20,11 +20,11 @@
                         <p>{{ 'Managed API access is active.' if config.groq_active and config.vt_active else 'Managed API access is not active.' }}</p>
                     </div>
                 </div>
-                <div style="display: flex; gap: 1rem; margin-top: 10px;">
-                    <span class="badge" style="background: {{ 'var(--success)' if config.groq_active else 'var(--danger)' }}; padding: 5px 10px; border-radius: 4px; color: white;">
+                <div class="status-badges">
+                    <span class="badge stack-badge" style="background: {{ 'var(--success)' if config.groq_active else 'var(--danger)' }};">
                         {{ '✓ AI Engine Online' if config.groq_active else '⚠ AI Config Missing' }}
                     </span>
-                    <span class="badge" style="background: {{ 'var(--success)' if config.vt_active else 'var(--danger)' }}; padding: 5px 10px; border-radius: 4px; color: white;">
+                    <span class="badge stack-badge" style="background: {{ 'var(--success)' if config.vt_active else 'var(--danger)' }};">
                         {{ '✓ Virus Scanner Online' if config.vt_active else '⚠ Scanner Config Missing' }}
                     </span>
                 </div>

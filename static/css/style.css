@@ -221,7 +221,7 @@ a:hover {
 }
 
 .user-email {
-    font-size: 11px;
+    font-size: 0.7rem;
     color: var(--text-muted);
 }
 
@@ -1636,4 +1636,201 @@ a:hover {
     .submit-button:active {
         transform: none !important;
     }
+}
+
+/* ============================================================
+   Repeated layout pulled off the templates.
+   Values match the inline styles they replace.
+   ============================================================ */
+
+.center { text-align: center; }
+
+.muted { color: var(--text-secondary); }
+
+.note {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.welcome-row,
+.section-head {
+    display: flex;
+    justify-content: space-between;
+}
+
+.welcome-row { align-items: center; }
+
+.section-head { margin-bottom: 1rem; }
+
+.btn.btn-compact { font-size: 0.8rem; }
+
+.btn.btn-icon {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+}
+
+.btn.btn-quiet {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn.btn-delete {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+}
+
+.chart-frame {
+    position: relative;
+    height: 250px;
+}
+
+.card-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+a.threat-item.threat-link {
+    text-decoration: none;
+    color: inherit;
+    align-items: center;
+    gap: 1rem;
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s;
+}
+
+.threat-info .threat-subject {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.threat-info .threat-time {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td { padding: 10px; }
+
+.history-table thead tr {
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.history-table tbody tr.history-row {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.history-date {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.history-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.feature-list {
+    list-style: none;
+    padding: 0;
+}
+
+.feature-item {
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: start;
+}
+
+.feature-icon {
+    margin-right: 12px;
+    font-size: 1.2rem;
+}
+
+.coverage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.coverage-tile {
+    background: var(--bg-primary);
+    padding: 1rem;
+    border-radius: var(--r-sm);
+    text-align: center;
+}
+
+.coverage-icon { font-size: 1.5rem; }
+
+.coverage-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 5px;
+}
+
+.chip-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.stack-badge {
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+.status-badges {
+    display: flex;
+    gap: 1rem;
+    margin-top: 10px;
+}
+
+.user-profile-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.user-avatar-img {
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--accent);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.stats-mini {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    text-align: center;
+}
+
+.stat-mini-value {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.stat-mini-label {
+    display: block;
+    color: var(--text-secondary);
+}
+
+.auth-footer.tight { margin-top: 10px; }
+
+.auth-footer .forgot-link {
+    font-size: 12px;
+    color: var(--text-muted);
 }
