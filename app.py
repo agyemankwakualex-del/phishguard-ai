@@ -120,6 +120,38 @@ class AnalysisHistory(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+def log_database_target(uri):
+    # Scheme, host, port, and whether DATABASE_URL is set. Never user, password, path, or query.
+    env_set = bool(os.environ.get('DATABASE_URL'))
+    try:
+        parsed = urllib.parse.urlparse(uri)
+        scheme = parsed.scheme if isinstance(parsed.scheme, str) else ''
+        host = parsed.hostname
+        port = parsed.port
+        if not scheme or any(c in scheme for c in ':/@?# \t\r\n'):
+            raise ValueError
+        if host is not None and any(c in host for c in '@/?# \t\r\n'):
+            raise ValueError
+        host_text = host or ''
+        port_text = '' if port is None else str(port)
+    except Exception:
+        safe_scheme = ''
+        if isinstance(uri, str) and '://' in uri:
+            head = uri.split('://', 1)[0]
+            if head and len(head) <= 64 and re.fullmatch(r'[A-Za-z][A-Za-z0-9+.-]*', head):
+                safe_scheme = head
+        if safe_scheme:
+            print(f'[phishguard] DATABASE_URL parse failed scheme={safe_scheme}', flush=True)
+        else:
+            print('[phishguard] DATABASE_URL parse failed', flush=True)
+        return
+    print(
+        f'[phishguard] db scheme={scheme} host={host_text} port={port_text} env_set={env_set}',
+        flush=True,
+    )
+
+log_database_target(app.config['SQLALCHEMY_DATABASE_URI'])
+
 with app.app_context():
     db.create_all()
 
