@@ -6,6 +6,8 @@ Includes: Centralized API Keys, VirusTotal, Gmail, and Profile Route
 from flask import Flask, abort, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_wtf.csrf import CSRFProtect
 from flask import send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -34,6 +36,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 # Checks POST, PUT, PATCH, and DELETE. GET logout and the Google callback are not checked.
 csrf = CSRFProtect(app)
+# Memory storage is per process. remote_addr is the client IP after ProxyFix.
+limiter = Limiter(get_remote_address, app=app, storage_uri='memory://', default_limits=[])
 
 def normalize_database_url(url):
     # Scheme prefix only. User, password, host, port, path, and query stay as given.
@@ -346,6 +350,7 @@ If External Intel says malicious, risk MUST be HIGH."""
 # ============================================================
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit('5 per minute', methods=['POST'])
 def register():
     if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
@@ -365,6 +370,7 @@ def register():
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit('5 per minute', methods=['POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
@@ -374,6 +380,12 @@ def login():
             return redirect(url_for('home'))
         flash('Invalid email or password.', 'error')
     return render_template('login.html')
+
+@app.errorhandler(429)
+def too_many_requests(_error):
+    flash('Too many attempts. Wait a minute and try again.', 'error')
+    template = 'register.html' if request.path.startswith('/register') else 'login.html'
+    return render_template(template), 429
 
 @app.route('/logout')
 @login_required
