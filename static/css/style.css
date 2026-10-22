@@ -1605,6 +1605,7 @@ a:hover {
 .link-row .is-high { color: var(--danger); }
 .link-row .is-medium { color: var(--warning); }
 .link-row .is-low { color: var(--success); }
+.link-row .is-unknown { color: var(--text-muted); font-weight: 600; }
 
 .email-original {
     background: #111;

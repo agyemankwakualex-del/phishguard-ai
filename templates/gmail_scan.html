@@ -142,7 +142,8 @@ async function analyzeSelected() {
                 if (data.risk_level === 'HIGH') color = 'red';
                 if (data.risk_level === 'MEDIUM') color = 'orange';
                 
-                statusDiv.innerHTML = `<span class="badge badge-${color}">${data.risk_level} (${data.risk_score})</span>`;
+                const engine = data.engine ? ` <span class="badge badge-gray">${data.engine}</span>` : '';
+                statusDiv.innerHTML = `<span class="badge badge-${color}">${data.risk_level} (${data.risk_score})</span>${engine}`;
             }
         } catch (e) {
             statusDiv.innerHTML = '<span class="badge badge-gray">Failed</span>';

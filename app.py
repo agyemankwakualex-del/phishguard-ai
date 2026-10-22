@@ -220,14 +220,20 @@ class PhishingAnalyzer:
     def check_virustotal(self, urls):
         detailed_results = []
         malicious_count = 0
-        
-        if not self.virustotal_api_key or not urls:
+
+        if not urls:
             return {'malicious_count': 0}, []
+
+        # No key, a 404, or a failed lookup is UNKNOWN. HIGH/MEDIUM/LOW need real stats.
+        if not self.virustotal_api_key:
+            return {'malicious_count': 0}, [
+                {'url': url, 'risk': 'UNKNOWN', 'note': 'Not checked'} for url in urls
+            ]
 
         headers = {"x-apikey": self.virustotal_api_key}
 
         for url in urls:
-            result_entry = {'url': url, 'risk': 'UNKNOWN'}
+            result_entry = {'url': url, 'risk': 'UNKNOWN', 'note': 'Not checked'}
             try:
                 url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
                 api_url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
@@ -237,7 +243,7 @@ class PhishingAnalyzer:
                 if response.status_code == 200:
                     data = response.json()
                     stats = data['data']['attributes']['last_analysis_stats']
-                    
+                    result_entry['note'] = ''
                     if stats['malicious'] > 0:
                         malicious_count += 1
                         result_entry['risk'] = 'HIGH'
@@ -246,9 +252,10 @@ class PhishingAnalyzer:
                     else:
                         result_entry['risk'] = 'LOW'
                 elif response.status_code == 404:
-                    result_entry['risk'] = 'LOW'
-            except Exception as e:
-                print(f"VT Error: {e}")
+                    result_entry['risk'] = 'UNKNOWN'
+                    result_entry['note'] = 'Not in VirusTotal'
+            except Exception:
+                print('VT Error')
             
             detailed_results.append(result_entry)
             
@@ -336,13 +343,13 @@ If External Intel says malicious, risk MUST be HIGH."""
     def analyze(self, email_data, use_ai=True):
         links = self.extract_links(email_data.get('body', ''))
         vt_summary, detailed_link_results = self.check_virustotal(links)
-        
-        if use_ai:
-            result = self.analyze_with_ai(email_data, vt_summary)
-            if result:
-                return result, links, detailed_link_results
-        
-        result = self.analyze_with_rules(email_data, vt_summary)
+        vt_used = bool(self.virustotal_api_key) and bool(links)
+
+        result = self.analyze_with_ai(email_data, vt_summary) if use_ai else None
+        if not result:
+            result = self.analyze_with_rules(email_data, vt_summary)
+        name = 'AI' if result.get('ai_powered') else 'Rules'
+        result['engine'] = f'{name} + VT' if vt_used else name
         return result, links, detailed_link_results
 
 # ============================================================
