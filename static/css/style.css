@@ -522,6 +522,14 @@ a:hover {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
+.btn:disabled,
+.btn:disabled:hover {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
 .btn-primary {
     background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
     color: white;
@@ -1270,6 +1278,16 @@ a:hover {
     margin-bottom: 20px;
 }
 
+.gmail-container .card-header {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.gmail-container .header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .email-list {
     display: flex;
     flex-direction: column;
@@ -1277,16 +1295,85 @@ a:hover {
 }
 
 .email-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
     background: var(--bg-hover);
     border-radius: 12px;
     padding: 18px;
     border-left: 4px solid var(--accent);
+    color: inherit;
+    cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .email-item:hover {
     transform: translateX(4px);
 }
+
+.email-item:has(.email-checkbox:checked) {
+    border-left-color: var(--success);
+    background: rgba(39, 174, 96, 0.16);
+}
+
+.email-checkbox {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+}
+
+.email-content {
+    display: block;
+    flex: 1;
+    min-width: 0;
+}
+
+.email-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.email-item .sender {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.email-item .subject,
+.email-item .preview {
+    display: block;
+}
+
+.email-item .subject {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.email-item .preview {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.email-status {
+    flex: 0 0 auto;
+}
+
+.email-status .badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.email-status .badge-gray { background: #444; color: #ccc; }
+.email-status .badge-red { background: var(--danger); color: white; }
+.email-status .badge-orange { background: var(--warning); color: white; }
+.email-status .badge-green { background: var(--success); color: white; }
 
 .email-header {
     display: flex;
