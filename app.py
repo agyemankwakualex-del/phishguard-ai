@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask import send_file
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta # <--- Added timedelta
 import json
@@ -28,6 +29,8 @@ from sqlalchemy.pool import NullPool
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
+# Vercel terminates TLS and forwards the public host and scheme.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 def normalize_database_url(url):
     # Scheme prefix only. User, password, host, port, path, and query stay as given.
@@ -636,6 +639,50 @@ def gmail_headers(message):
             found[name] = item.get('value') or ''
     return found
 
+def gmail_redirect_uri():
+    # One value for the authorize redirect and the token exchange. They must match.
+    override = (os.environ.get('GMAIL_REDIRECT_URI') or '').strip()
+    if override:
+        return override
+    return url_for('gmail_callback', _external=True)
+
+
+def refresh_gmail_access_token(user):
+    refresh_token = (user.gmail_refresh_token or '').strip()
+    if not refresh_token or not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        return False
+    response = requests.post('https://oauth2.googleapis.com/token', data={
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'refresh_token': refresh_token,
+        'grant_type': 'refresh_token',
+    })
+    if response.status_code != 200:
+        return False
+    tokens = response.json()
+    access_token = tokens.get('access_token')
+    if not access_token:
+        return False
+    user.gmail_token = access_token
+    if tokens.get('refresh_token'):
+        user.gmail_refresh_token = tokens['refresh_token']
+    db.session.commit()
+    return True
+
+
+def gmail_api_get(user, url, params=None):
+    def _get():
+        return requests.get(
+            url,
+            headers={'Authorization': f'Bearer {user.gmail_token}'},
+            params=params,
+        )
+    response = _get()
+    if response.status_code == 401 and refresh_gmail_access_token(user):
+        response = _get()
+    return response
+
+
 @app.route('/gmail/connect')
 @login_required
 def gmail_connect():
@@ -643,12 +690,19 @@ def gmail_connect():
         flash('Google Login not configured on server.', 'error')
         return redirect(url_for('settings_page'))
         
-    redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 'http://127.0.0.1:5000/gmail/callback')
+    redirect_uri = gmail_redirect_uri()
     
     # 1. SCOPES: We ask for BOTH Read-Only Gmail AND User Email Profile
     scope = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email"
-    
-    return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?client_id={GOOGLE_CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope={scope}&access_type=offline&prompt=consent")
+    query = urllib.parse.urlencode({
+        'client_id': GOOGLE_CLIENT_ID,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': scope,
+        'access_type': 'offline',
+        'prompt': 'consent',
+    })
+    return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{query}')
 
 @app.route('/gmail/callback')
 @login_required
@@ -661,7 +715,7 @@ def gmail_callback():
         flash('Login failed: No authorization code received from Google. Please try again.', 'error')
         return redirect(url_for('settings_page'))
 
-    redirect_uri = os.environ.get('GMAIL_REDIRECT_URI', 'http://127.0.0.1:5000/gmail/callback')
+    redirect_uri = gmail_redirect_uri()
     
     data = {
         'code': code, 
@@ -714,11 +768,17 @@ def gmail_disconnect():
 def gmail_scan():
     if not current_user.gmail_token: return redirect(url_for('settings_page'))
     
-    headers = {'Authorization': f'Bearer {current_user.gmail_token}'}
     try:
-        r = requests.get('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&labelIds=INBOX', headers=headers)
+        r = gmail_api_get(
+            current_user,
+            'https://gmail.googleapis.com/gmail/v1/users/me/messages',
+            params={'maxResults': 15, 'labelIds': 'INBOX'},
+        )
         if r.status_code != 200:
-            flash('Token expired. Please reconnect Gmail.', 'error')
+            if r.status_code == 401:
+                flash('Token expired. Please reconnect Gmail.', 'error')
+            else:
+                flash('Error scanning inbox.', 'error')
             return redirect(url_for('settings_page'))
             
         messages = r.json().get('messages', [])
@@ -726,9 +786,9 @@ def gmail_scan():
         
         for msg in messages:
             try:
-                m_r = requests.get(
+                m_r = gmail_api_get(
+                    current_user,
                     f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg["id"]}',
-                    headers=headers,
                     params={'format': 'full'},
                 )
                 if m_r.status_code != 200:
@@ -758,11 +818,10 @@ def gmail_scan():
 def gmail_analyze_single(msg_id):
     if not current_user.gmail_token: return jsonify({'error': 'No token'})
     
-    headers = {'Authorization': f'Bearer {current_user.gmail_token}'}
     try:
-        r = requests.get(
+        r = gmail_api_get(
+            current_user,
             f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}',
-            headers=headers,
             params={'format': 'full'},
         )
         if r.status_code != 200: return jsonify({'error': 'Fetch failed'})
@@ -799,11 +858,8 @@ def gmail_analyze_single(msg_id):
     
 @app.route('/site-qr')
 def site_qr():
+    base_url = url_for('home', _external=True)
 
-    
-    # URL of your Render site
-    base_url = "https://phishguard-ai-g6iu.onrender.com"
-    
     # Generate QR
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(base_url)

@@ -30,6 +30,8 @@ Set these names in the process environment. Leave them unset to boot with rules 
 
 `GROQ_MODEL` is optional. When it is unset or blank, `analyze_with_ai` calls `openai/gpt-oss-20b`. Groq shut down developer access to `llama-3.1-8b-instant` on 16 August 2026 and lists that model as the replacement. It is a production chat model with JSON object mode. Set `GROQ_MODEL` to switch models without a code change. `GROQ_API_KEY` still has to be set or analysis stays on the built-in rules.
 
+`GMAIL_REDIRECT_URI` is optional. When it is unset, the Gmail connect and callback routes both use this request's `/gmail/callback` URL, so it is `https` on Vercel. Set it only to force one specific callback.
+
 - `SECRET_KEY`
 - `DATABASE_URL`
 - `DATABASE_HOSTADDR`
