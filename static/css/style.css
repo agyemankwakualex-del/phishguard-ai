@@ -210,6 +210,28 @@ a:hover {
     font-size: 18px;
 }
 
+.user-avatar-initials {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 0.02em;
+}
+
+.logout-form {
+    margin: 0;
+}
+
+button.user-link {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+}
+
 .user-details {
     flex: 1;
 }

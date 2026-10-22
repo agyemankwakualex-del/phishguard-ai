@@ -26,13 +26,17 @@ If `DATABASE_URL` is unset, the app uses SQLite and creates tables on startup.
 
 ## Environment
 
-Set these names in the process environment. Leave them unset to boot with rules only. Do not commit values. `.env.example` lists the same names; the app does not load that file.
+Set these names in the process environment. Leave the API names unset to boot with rules only. Do not commit values. `.env.example` lists the same names; the app does not load that file.
+
+`SECRET_KEY` is required. If it is missing or blank, startup raises `RuntimeError`. Gmail access and refresh tokens are encrypted with SHA-256 of that key before they are stored. A value that cannot be decrypted, including an older plaintext row or a token saved under a previous key, is treated as disconnected so the user can connect again. Logout is a POST with the CSRF token. Registration rejects a password shorter than 8 characters. A duplicate email or username gets one generic message and does not say which field was taken.
+
+Gmail connect puts a random `state` in the session and on the Google URL. The callback redirects back to settings if that value is missing or does not match.
 
 `GROQ_MODEL` is optional. When it is unset or blank, `analyze_with_ai` calls `openai/gpt-oss-20b`. Groq shut down developer access to `llama-3.1-8b-instant` on 16 August 2026 and lists that model as the replacement. It is a production chat model with JSON object mode. Set `GROQ_MODEL` to switch models without a code change. `GROQ_API_KEY` still has to be set or analysis stays on the built-in rules.
 
 `GMAIL_REDIRECT_URI` is optional. When it is unset, the Gmail connect and callback routes both use this request's `/gmail/callback` URL, so it is `https` on Vercel. Set it only to force one specific callback.
 
-- `SECRET_KEY`
+- `SECRET_KEY` (required)
 - `DATABASE_URL`
 - `DATABASE_HOSTADDR`
 - `GROQ_API_KEY`

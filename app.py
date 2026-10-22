@@ -18,7 +18,9 @@ import base64
 import html
 import urllib.parse
 import hashlib
+import secrets
 import requests
+from cryptography.fernet import Fernet
 import qrcode
 from html.parser import HTMLParser
 from io import BytesIO
@@ -29,11 +31,15 @@ from sqlalchemy.pool import NullPool
 # ============================================================
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
+_secret_key = (os.environ.get('SECRET_KEY') or '').strip()
+if not _secret_key:
+    raise RuntimeError('SECRET_KEY is not set. Set it in the environment before starting PhishGuard.')
+app.secret_key = _secret_key
 # Vercel terminates TLS and forwards the public host and scheme.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-# Checks POST, PUT, PATCH, and DELETE. GET logout and the Google callback are not checked.
+# Checks POST, PUT, PATCH, and DELETE. The Google callback stays GET.
 csrf = CSRFProtect(app)
+HTTP_TIMEOUT = 10
 
 def normalize_database_url(url):
     # Scheme prefix only. User, password, host, port, path, and query stay as given.
@@ -109,6 +115,31 @@ def utc_now_naive():
 # DATABASE MODELS
 # ============================================================
 
+def _token_fernet():
+    secret = app.secret_key
+    if isinstance(secret, str):
+        secret = secret.encode('utf-8')
+    # Fernet wants 32 url-safe base64 bytes. SHA-256 of SECRET_KEY is those 32 bytes.
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(secret).digest()))
+
+
+def encrypt_secret(value):
+    value = (value or '').strip()
+    if not value:
+        return ''
+    return _token_fernet().encrypt(value.encode('utf-8')).decode('ascii')
+
+
+def decrypt_secret(value):
+    # Old plaintext rows and a rotated SECRET_KEY both fail here. Caller treats that as disconnected.
+    if not value:
+        return ''
+    try:
+        return _token_fernet().decrypt(str(value).encode('ascii')).decode('utf-8')
+    except Exception:
+        return ''
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
@@ -122,22 +153,42 @@ class User(UserMixin, db.Model):
     groq_api_key = db.Column(db.String(256), default='')
     virustotal_api_key = db.Column(db.String(256), default='')
     
-    # Gmail Tokens
-    gmail_token = db.Column(db.Text, default='')
-    gmail_refresh_token = db.Column(db.Text, default='')
+    # Gmail tokens are encrypted by the properties below. gmail_email stays plaintext.
     gmail_email = db.Column(db.String(120), default='')
     
     analyses = db.relationship('AnalysisHistory', backref='user', lazy=True)
     
+    # Ciphertext lives in the existing columns. Plaintext is only on the properties.
+    _gmail_token = db.Column('gmail_token', db.Text, default='')
+    _gmail_refresh_token = db.Column('gmail_refresh_token', db.Text, default='')
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-    
-    def avatar(self, size):
-        digest = hashlib.md5(self.email.lower().encode('utf-8')).hexdigest()
-        return f'https://www.gravatar.com/avatar/{digest}?d=identicon&s={size}'
+
+    @property
+    def gmail_token(self):
+        return decrypt_secret(self._gmail_token)
+
+    @gmail_token.setter
+    def gmail_token(self, value):
+        self._gmail_token = encrypt_secret(value)
+
+    @property
+    def gmail_refresh_token(self):
+        return decrypt_secret(self._gmail_refresh_token)
+
+    @gmail_refresh_token.setter
+    def gmail_refresh_token(self, value):
+        self._gmail_refresh_token = encrypt_secret(value)
+
+    def initials(self):
+        source = (self.username or '').strip() or (self.email or '?')
+        parts = [part for part in re.split(r'[\s._@-]+', source) if part]
+        letters = ''.join(part[0] for part in parts[:2])
+        return (letters or '?').upper()
 
 
 class AnalysisHistory(db.Model):
@@ -245,7 +296,7 @@ class PhishingAnalyzer:
                 url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
                 api_url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
                 
-                response = requests.get(api_url, headers=headers)
+                response = requests.get(api_url, headers=headers, timeout=HTTP_TIMEOUT)
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -431,6 +482,9 @@ def register():
         if password != request.form.get('confirm_password', ''):
             flash('Passwords do not match.', 'error')
             return render_template('register.html')
+        if len(password) < 8:
+            flash('Password must be at least 8 characters.', 'error')
+            return render_template('register.html')
         user = User(username=request.form['username'], email=request.form['email'].lower())
         user.set_password(password)
         try:
@@ -438,8 +492,9 @@ def register():
             db.session.commit()
             flash('Account created! Please login.', 'success')
             return redirect(url_for('login'))
-        except:
-            flash('Email or username already exists.', 'error')
+        except Exception:
+            db.session.rollback()
+            flash('Could not create account with those details.', 'error')
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -464,10 +519,9 @@ def too_many_requests(_error):
     template = 'register.html' if request.path.startswith('/register') else 'login.html'
     return render_template(template), 429
 
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 @login_required
 def logout():
-    # GET on purpose. CSRFProtect does not check safe methods.
     logout_user()
     flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
@@ -555,8 +609,8 @@ def settings_page():
     config = {
         'groq_active': bool(SYSTEM_GROQ_KEY),
         'vt_active': bool(SYSTEM_VT_KEY),
-        'gmail_connected': bool(current_user.gmail_email),
-        'gmail_email': current_user.gmail_email,
+        'gmail_connected': bool((current_user.gmail_token or '').strip()),
+        'gmail_email': current_user.gmail_email if (current_user.gmail_token or '').strip() else '',
         'gmail_available': bool(GOOGLE_CLIENT_ID)
     }
     return render_template('settings.html', config=config)
@@ -757,7 +811,7 @@ def refresh_gmail_access_token(user):
         'client_secret': GOOGLE_CLIENT_SECRET,
         'refresh_token': refresh_token,
         'grant_type': 'refresh_token',
-    })
+    }, timeout=HTTP_TIMEOUT)
     if response.status_code != 200:
         return False
     tokens = response.json()
@@ -777,6 +831,7 @@ def gmail_api_get(user, url, params=None):
             url,
             headers={'Authorization': f'Bearer {user.gmail_token}'},
             params=params,
+            timeout=HTTP_TIMEOUT,
         )
     response = _get()
     if response.status_code == 401 and refresh_gmail_access_token(user):
@@ -795,6 +850,8 @@ def gmail_connect():
     
     # 1. SCOPES: We ask for BOTH Read-Only Gmail AND User Email Profile
     scope = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email"
+    state = secrets.token_urlsafe(32)
+    session['gmail_oauth_state'] = state
     query = urllib.parse.urlencode({
         'client_id': GOOGLE_CLIENT_ID,
         'redirect_uri': redirect_uri,
@@ -802,6 +859,7 @@ def gmail_connect():
         'scope': scope,
         'access_type': 'offline',
         'prompt': 'consent',
+        'state': state,
     })
     return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{query}')
 
@@ -816,6 +874,11 @@ def gmail_callback():
         flash('Login failed: No authorization code received from Google. Please try again.', 'error')
         return redirect(url_for('settings_page'))
 
+    saved_state = session.pop('gmail_oauth_state', None)
+    if not saved_state or request.args.get('state') != saved_state:
+        flash('Gmail sign-in could not be verified. Please try again.', 'error')
+        return redirect(url_for('settings_page'))
+
     redirect_uri = gmail_redirect_uri()
     
     data = {
@@ -828,7 +891,7 @@ def gmail_callback():
     
     try:
         # 4. Exchange Code for Token
-        r = requests.post('https://oauth2.googleapis.com/token', data=data)
+        r = requests.post('https://oauth2.googleapis.com/token', data=data, timeout=HTTP_TIMEOUT)
         
         if r.status_code == 200:
             tokens = r.json()
@@ -848,6 +911,7 @@ def gmail_callback():
                 user_info = requests.get(
                     'https://www.googleapis.com/oauth2/v2/userinfo',
                     headers={'Authorization': f'Bearer {access_token}'},
+                    timeout=HTTP_TIMEOUT,
                 )
                 if user_info.status_code == 200:
                     email = (user_info.json() or {}).get('email') or ''

@@ -79,7 +79,7 @@
                 <div class="user-info">
                     <!-- Wrapped in Link -->
                     <a href="{{ url_for('profile_page') }}" class="user-profile-link">
-                        <img src="{{ current_user.avatar(36) }}" alt="Avatar" class="user-avatar-img">
+                        <span class="user-avatar user-avatar-initials" aria-hidden="true">{{ current_user.initials() }}</span>
                         <div class="user-details">
                             <span class="user-name">{{ current_user.username }}</span>
                             <span class="user-email">{{ current_user.email[:15] }}...</span>
@@ -88,7 +88,10 @@
                 </div>
                 <div class="user-actions">
                     <a href="{{ url_for('profile_page') }}" class="user-link">Profile</a>
-                    <a href="{{ url_for('logout') }}" class="user-link logout">Logout</a>
+                    <form method="POST" action="{{ url_for('logout') }}" class="logout-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="user-link logout">Logout</button>
+                    </form>
                 </div>
             </div>
             {% endif %}
