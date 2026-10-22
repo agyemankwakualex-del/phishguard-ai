@@ -41,7 +41,7 @@
                 </li>
                 <li>
                     <strong>AI.</strong>
-                    When AI is on and a Groq key is set, <code>openai/gpt-oss-20b</code> reads the sender, the subject, and the first 2,000 characters of the body.
+                    When AI is on and a Groq key is set, <code>openai/gpt-oss-20b</code> reads the sender, the subject, and the first {{ '{:,}'.format(ai_body_limit) }} characters of the body.
                     The request asks Groq for a JSON object and tells the model when VirusTotal found malicious links.
                 </li>
                 <li>

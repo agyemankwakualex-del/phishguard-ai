@@ -235,7 +235,7 @@ with app.app_context():
 # ============================================================
 
 # Characters of the body sent to Groq. Link extraction still uses the full body.
-AI_BODY_LIMIT = 2000
+AI_BODY_LIMIT = 6000
 
 class PhishingAnalyzer:
     def __init__(self, groq_key, vt_key):
@@ -394,7 +394,7 @@ If External Intel says malicious, risk MUST be HIGH."""
         result['vt_unknown'] = any(item.get('risk') == 'UNKNOWN' for item in detailed_link_results)
         body = email_data.get('body') or ''
         if result['engine'].startswith('AI') and len(body) > AI_BODY_LIMIT:
-            result['ai_body_note'] = 'AI read the first 2,000 characters of this email.'
+            result['ai_body_note'] = f'AI read the first {AI_BODY_LIMIT:,} characters of this email.'
         else:
             result['ai_body_note'] = ''
         return result, links, detailed_link_results
@@ -587,7 +587,7 @@ def analyze_page():
         
         return render_template('results.html', result=result, email=data, links=links, link_results=link_results)
     
-    return render_template('analyze.html')
+    return render_template('analyze.html', ai_body_limit=AI_BODY_LIMIT)
 
 @app.route('/history')
 @login_required
@@ -696,7 +696,8 @@ def profile_page():
     return render_template('profile.html')
 
 @app.route('/about')
-def about_page(): return render_template('about.html')
+def about_page():
+    return render_template('about.html', ai_body_limit=AI_BODY_LIMIT)
 
 # ============================================================
 # GMAIL INTEGRATION (Final Fix)
