@@ -6,6 +6,7 @@ Includes: Centralized API Keys, VirusTotal, Gmail, and Profile Route
 from flask import Flask, abort, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_wtf.csrf import CSRFProtect
 from flask import send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -31,6 +32,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 # Vercel terminates TLS and forwards the public host and scheme.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+# Checks POST, PUT, PATCH, and DELETE. GET logout and the Google callback are not checked.
+csrf = CSRFProtect(app)
 
 def normalize_database_url(url):
     # Scheme prefix only. User, password, host, port, path, and query stay as given.
@@ -375,6 +378,7 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    # GET on purpose. CSRFProtect does not check safe methods.
     logout_user()
     flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
@@ -821,7 +825,7 @@ def gmail_scan():
         flash('Error scanning inbox.', 'error')
         return redirect(url_for('home'))
 
-@app.route('/gmail/analyze/<msg_id>')
+@app.route('/gmail/analyze/<msg_id>', methods=['POST'])
 @login_required
 def gmail_analyze_single(msg_id):
     if not current_user.gmail_token: return jsonify({'error': 'No token'})

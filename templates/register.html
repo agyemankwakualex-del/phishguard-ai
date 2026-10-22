@@ -4,6 +4,7 @@
 
 {% block content %}
 <form method="POST" class="auth-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h2>Create Account</h2>
     <p class="auth-subtitle">Start protecting your inbox</p>
     
