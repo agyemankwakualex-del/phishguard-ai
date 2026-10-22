@@ -415,7 +415,7 @@ button.user-link {
 }
 
 .card-body {
-    padding: 24px;
+    padding: var(--r-lg);
 }
 
 /* ============================================================
@@ -762,8 +762,12 @@ button.user-link {
     border-radius: 10px;
     margin-bottom: 10px;
     transition: all 0.2s ease;
-    border-left: 4px solid var(--danger);
+    border-left: 4px solid var(--border-color);
 }
+
+.threat-item.is-high { border-left-color: var(--danger); }
+.threat-item.is-medium { border-left-color: var(--warning); }
+.threat-item.is-low { border-left-color: var(--success); }
 
 .threat-item:hover {
     transform: translateX(4px);
@@ -1120,7 +1124,14 @@ button.user-link {
    ============================================================ */
 
 .settings-container {
-    max-width: 800px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.settings-container > .card {
+    margin-bottom: 0;
 }
 
 .status-badge {
@@ -1561,6 +1572,10 @@ button.user-link {
         margin-left: 0;
         padding: 16px;
     }
+
+    .settings-container {
+        grid-template-columns: 1fr;
+    }
     
     .mobile-menu-toggle {
         display: flex;
@@ -1669,19 +1684,9 @@ button.user-link {
 
 .pdf-header {
     display: none;
-    text-align: center;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 10px;
 }
 
-.pdf-header h1 { color: #000; }
-.pdf-header p { color: #666; }
-
 .score-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     border-left: 6px solid var(--success);
     box-shadow: var(--glow-accent), var(--e2), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
@@ -1691,6 +1696,19 @@ button.user-link {
 .score-card.is-low { border-left-color: var(--success); }
 
 .score-card h2 { margin: 10px 0; }
+
+.score-card .card-body { min-width: 0; }
+
+.reason-list {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.recommendation {
+    margin: 0;
+    font-size: 1.1rem;
+    font-style: italic;
+}
 
 .details-grid {
     display: grid;
@@ -1770,7 +1788,16 @@ button.user-link {
 
 .welcome-row { align-items: center; }
 
-.section-head { margin-bottom: 1rem; }
+.section-head {
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1rem;
+}
+
+.section-head h3,
+.section-head form { margin: 0; }
+
+.table-scroll { overflow-x: auto; }
 
 .btn.btn-compact { font-size: 0.8rem; }
 
@@ -1952,6 +1979,62 @@ a.threat-item.threat-link {
 
 .about-container code {
     font-size: 0.92em;
+}
+
+@media print {
+    .sidebar,
+    .mobile-menu-toggle,
+    .page-header,
+    .header-actions {
+        display: none !important;
+    }
+
+    .app-container { display: block; }
+
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body,
+    .pdf-area,
+    .card,
+    .card-body,
+    .email-original,
+    .link-row {
+        background: #fff !important;
+        color: #111 !important;
+        box-shadow: none !important;
+        transform: none !important;
+        backdrop-filter: none !important;
+    }
+
+    .pdf-header {
+        display: block !important;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #ccc;
+    }
+
+    .pdf-header h1,
+    .pdf-header p,
+    .card h2,
+    .card h3,
+    .card p,
+    .card li,
+    .muted,
+    .note,
+    .email-original,
+    .link-row,
+    .link-row .risk {
+        color: #111 !important;
+    }
+
+    .card {
+        overflow: visible !important;
+        border: 1px solid #ccc !important;
+        break-inside: avoid;
+    }
 }
 
 .status-badges {
