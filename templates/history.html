@@ -19,6 +19,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Risk</th>
+                    <th>Engine</th>
                     <th>Sender</th>
                     <th>Subject</th>
                     <th>Score</th>
@@ -33,6 +34,7 @@
                     <td>
                         <span class="risk-badge risk-{{ item.risk_level }}">{{ item.risk_level }}</span>
                     </td>
+                    <td>{{ item.engine|engine_label }}</td>
                     <td>{{ item.sender[:20] }}...</td>
                     <td>{{ item.subject[:30] }}...</td>
                     
@@ -54,7 +56,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" style="text-align: center; padding: 20px;">No history found.</td>
+                    <td colspan="6" class="history-empty">No history found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

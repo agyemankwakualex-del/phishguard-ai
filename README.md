@@ -32,7 +32,7 @@ Set these names in the process environment. Leave the API names unset to boot wi
 
 Gmail connect puts a random `state` in the session and on the Google URL. The callback redirects back to settings if that value is missing or does not match.
 
-`GROQ_MODEL` is optional. When it is unset or blank, `analyze_with_ai` calls `openai/gpt-oss-20b`. Groq shut down developer access to `llama-3.1-8b-instant` on 16 August 2026 and lists that model as the replacement. It is a production chat model with JSON object mode. Set `GROQ_MODEL` to switch models without a code change. `GROQ_API_KEY` still has to be set or analysis stays on the built-in rules.
+`GROQ_MODEL` is optional. When it is unset or blank, `analyze_with_ai` calls `openai/gpt-oss-20b`. Groq shut down developer access to `llama-3.1-8b-instant` on 16 August 2026 and lists that model as the replacement. The call sends `response_format` type `json_object`. The prompt still asks for JSON, and a fenced reply is still parsed if the text contains a fence. The model is given the first 6,000 characters of the body (`AI_BODY_LIMIT`). Set `GROQ_MODEL` to switch models without a code change. `GROQ_API_KEY` still has to be set or analysis stays on the built-in rules.
 
 `GMAIL_REDIRECT_URI` is optional. When it is unset, the Gmail connect and callback routes both use this request's `/gmail/callback` URL, so it is `https` on Vercel. Set it only to force one specific callback.
 
@@ -54,7 +54,7 @@ The IP is the `x-real-ip` header. [Vercel sets that to the visitor's public addr
 
 ## Gmail
 
-Gmail scanning reads the full message body, not the snippet alone. The inbox list loads up to 15 messages with the `gmail.readonly` scope. Each message is fetched in Gmail `full` format. The body prefers `text/plain` and falls back to `text/html` with tags removed. `http` and `https` links from the HTML are kept, and script and style text are not. Analysis receives at most 100,000 characters of that text, through the same path as paste-to-analyze, so links in the body are checked. The existing limit of 5 URLs still applies. If a message has no readable body, analysis uses the snippet. One message that cannot be read does not stop the scan. The full email body is not stored.
+Gmail scanning reads the message body, not the snippet alone. The inbox list loads up to 15 messages with the `gmail.readonly` scope. Each message is fetched in Gmail `full` format. The body prefers `text/plain` and falls back to `text/html` with tags removed. `http` and `https` links from the HTML are kept, and script and style text are not. Analysis receives at most 100,000 characters of that text, through the same path as paste-to-analyze. Link extraction uses that full text and keeps the first 5 unique http(s) URLs in the order they appear. The Groq call only receives the first 6,000 characters of the body. If a message has no readable body, analysis uses the snippet. One message that cannot be read does not stop the scan. The full email body is not stored. History stores the engine that produced the row (`AI`, `Rules`, `AI + VT`, or `Rules + VT`). Rows from before that column existed say `Not recorded`.
 
 ## Vercel
 

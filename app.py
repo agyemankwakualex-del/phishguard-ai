@@ -202,6 +202,9 @@ class AnalysisHistory(db.Model):
     risk_score = db.Column(db.Integer, default=0)
     reasons = db.Column(db.Text, default='[]')
     timestamp = db.Column(db.DateTime, default=utc_now_naive)
+    # Short code from PhishingAnalyzer.analyze: AI, Rules, AI + VT, Rules + VT.
+    # Rows created before this column existed stay 'Not recorded'.
+    engine = db.Column(db.String(40), nullable=False, default='Not recorded')
     
     def get_reasons(self):
         try: return json.loads(self.reasons)
@@ -260,12 +263,30 @@ def log_database_target(uri):
 
 log_database_target(app.config['SQLALCHEMY_DATABASE_URI'])
 
+def ensure_history_engine_column():
+    # create_all does not add a column to a table that already exists.
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    if 'analysis_history' not in inspector.get_table_names():
+        return
+    names = {column['name'] for column in inspector.get_columns('analysis_history')}
+    if 'engine' in names:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE analysis_history ADD COLUMN engine VARCHAR(40) NOT NULL DEFAULT 'Not recorded'"
+        ))
+
 with app.app_context():
     db.create_all()
+    ensure_history_engine_column()
 
 # ============================================================
 # PHISHING ANALYZER CORE
 # ============================================================
+
+# Characters of the body sent to Groq. Link extraction still uses the full body.
+AI_BODY_LIMIT = 6000
 
 class PhishingAnalyzer:
     def __init__(self, groq_key, vt_key):
@@ -273,7 +294,14 @@ class PhishingAnalyzer:
         self.virustotal_api_key = vt_key
     
     def extract_links(self, text):
-        return list(set(re.findall(r'https?://[^\s<>"\'}\]]+', text)))[:5]
+        # First 5 unique http(s) links in order of appearance. A set would not be stable.
+        ordered = []
+        for url in re.findall(r'https?://[^\s<>"\'}\]]+', text or ''):
+            if url not in ordered:
+                ordered.append(url)
+            if len(ordered) == 5:
+                break
+        return ordered
 
     def check_virustotal(self, urls):
         detailed_results = []
@@ -309,6 +337,10 @@ class PhishingAnalyzer:
                         result_entry['risk'] = 'MEDIUM'
                     else:
                         result_entry['risk'] = 'LOW'
+                elif response.status_code == 429:
+                    result_entry['risk'] = 'UNKNOWN'
+                    result_entry['note'] = 'Rate limited'
+                    result_entry['rate_limited'] = True
                 elif response.status_code == 404:
                     result_entry['risk'] = 'UNKNOWN'
                     result_entry['note'] = 'Not in VirusTotal'
@@ -336,7 +368,7 @@ External Intel: {vt_context}
 
 From: {email_data.get('sender', 'Unknown')}
 Subject: {email_data.get('subject', '')}
-Body: {email_data.get('body', '')[:2000]}
+Body: {(email_data.get('body') or '')[:AI_BODY_LIMIT]}
 
 Respond in strictly valid JSON:
 {{
@@ -354,7 +386,8 @@ If External Intel says malicious, risk MUST be HIGH."""
                     {"role": "system", "content": "JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1
+                temperature=0.1,
+                response_format={"type": "json_object"},
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -408,7 +441,26 @@ If External Intel says malicious, risk MUST be HIGH."""
             result = self.analyze_with_rules(email_data, vt_summary)
         name = 'AI' if result.get('ai_powered') else 'Rules'
         result['engine'] = f'{name} + VT' if vt_used else name
+        result['vt_rate_limited'] = any(item.get('rate_limited') for item in detailed_link_results)
+        result['vt_unknown'] = any(item.get('risk') == 'UNKNOWN' for item in detailed_link_results)
+        body = email_data.get('body') or ''
+        if result['engine'].startswith('AI') and len(body) > AI_BODY_LIMIT:
+            result['ai_body_note'] = f'AI read the first {AI_BODY_LIMIT:,} characters of this email.'
+        else:
+            result['ai_body_note'] = ''
         return result, links, detailed_link_results
+
+@app.template_filter('engine_label')
+def engine_label(value):
+    labels = {
+        'AI + VT': 'AI + VirusTotal',
+        'AI': 'AI only',
+        'Rules + VT': 'Rules + VirusTotal',
+        'Rules': 'Rule-based',
+        'Not recorded': 'Not recorded',
+    }
+    key = value or 'Not recorded'
+    return labels.get(key, key)
 
 # ============================================================
 # ROUTES
@@ -580,7 +632,8 @@ def analyze_page():
             sender=data['sender'] or 'Unknown',
             subject=data['subject'] or '(No Subject)', 
             risk_level=result['risk_level'],
-            risk_score=result['risk_score']
+            risk_score=result['risk_score'],
+            engine=(result.get('engine') or 'Not recorded')[:40],
         )
         entry.set_reasons(result['reasons'])
         db.session.add(entry)
@@ -588,7 +641,7 @@ def analyze_page():
         
         return render_template('results.html', result=result, email=data, links=links, link_results=link_results)
     
-    return render_template('analyze.html')
+    return render_template('analyze.html', ai_body_limit=AI_BODY_LIMIT)
 
 @app.route('/history')
 @login_required
@@ -601,7 +654,8 @@ def history_page():
 def clear_history():
     AnalysisHistory.query.filter_by(user_id=current_user.id).delete()
     db.session.commit()
-    return jsonify({'success': True})
+    flash('History cleared.', 'success')
+    return redirect(url_for('history_page'))
 
 @app.route('/settings')
 @login_required
@@ -630,13 +684,15 @@ def view_analysis(id):
         flash('Unauthorized access.', 'error')
         return redirect(url_for('history_page'))
     
-    # Reconstruct the result object for the template
+    engine = entry.engine or 'Not recorded'
     result = {
         'risk_level': entry.risk_level,
         'risk_score': entry.risk_score,
         'reasons': entry.get_reasons(),
         'recommendation': "Review past analysis." if entry.risk_level == 'LOW' else "Caution advised based on past scan.",
-        'ai_powered': True # Assuming historical items used AI
+        'ai_powered': engine.startswith('AI'),
+        'engine': engine,
+        'ai_body_note': '',
     }
     
     # Reconstruct email object
@@ -677,14 +733,16 @@ def profile_page():
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'change_password':
-            current_pass = request.form.get('current_password')
-            new_pass = request.form.get('new_password')
-            confirm_pass = request.form.get('confirm_password')
+            current_pass = request.form.get('current_password') or ''
+            new_pass = request.form.get('new_password') or ''
+            confirm_pass = request.form.get('confirm_password') or ''
             
             if not current_user.check_password(current_pass):
                 flash('Incorrect current password.', 'error')
             elif new_pass != confirm_pass:
                 flash('New passwords do not match.', 'error')
+            elif len(new_pass) < 8:
+                flash('Password must be at least 8 characters.', 'error')
             else:
                 current_user.set_password(new_pass)
                 db.session.commit()
@@ -692,7 +750,8 @@ def profile_page():
     return render_template('profile.html')
 
 @app.route('/about')
-def about_page(): return render_template('about.html')
+def about_page():
+    return render_template('about.html', ai_body_limit=AI_BODY_LIMIT)
 
 # ============================================================
 # GMAIL INTEGRATION (Final Fix)
@@ -1048,7 +1107,8 @@ def gmail_analyze_single(msg_id):
             sender=headers_dict.get('from', 'Unknown')[:200],
             subject=headers_dict.get('subject', '(No Subject)')[:500], 
             risk_level=result['risk_level'],
-            risk_score=result['risk_score']
+            risk_score=result['risk_score'],
+            engine=(result.get('engine') or 'Not recorded')[:40],
         )
         entry.set_reasons(result['reasons'])
         db.session.add(entry)

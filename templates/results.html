@@ -21,8 +21,11 @@
             <span class="risk-badge risk-{{ result.risk_level }}">VERDICT: {{ result.risk_level }} RISK</span>
             <h2>Risk Score: {{ result.risk_score }}/100</h2>
             <p class="muted">
-                Engine: {{ '🤖 AI + VirusTotal' if result.ai_powered else '📋 Rule-Based' }}
+                Engine: {{ result.engine|engine_label }}
             </p>
+            {% if result.ai_body_note %}
+            <p class="note">{{ result.ai_body_note }}</p>
+            {% endif %}
         </div>
     </div>
 
