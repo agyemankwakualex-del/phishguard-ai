@@ -14,37 +14,32 @@
                 Connected: {{ current_user.gmail_email }}
             </h3>
             <div class="header-actions">
-                <button onclick="analyzeSelected()" class="btn btn-primary" id="btn-scan-all" disabled>
-                    ⚡ Analyze Selected (<span id="count">0</span>)
+                <button type="button" class="btn btn-secondary" id="btn-select-all" onclick="toggleAll()" {% if not emails %}disabled{% endif %}>
+                    Select all ({{ emails|length }})
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-scan-all" onclick="analyzeSelected()" disabled>
+                    Analyze selected (0)
                 </button>
             </div>
         </div>
         <div class="card-body">
             {% if emails %}
             <div class="email-list">
-                <div class="list-header">
-                    <label class="checkbox-label">
-                        <input type="checkbox" onchange="toggleAll(this)"> Select All
-                    </label>
-                </div>
-                
                 {% for email in emails %}
-                <div class="email-item" id="email-{{ email.id }}">
-                    <div class="email-check">
-                        <input type="checkbox" class="email-checkbox" value="{{ email.id }}" onchange="updateCount()">
-                    </div>
-                    <div class="email-content">
-                        <div class="email-top">
+                <label class="email-item" id="email-{{ email.id }}">
+                    <input type="checkbox" class="email-checkbox" value="{{ email.id }}" onchange="updateCount()">
+                    <span class="email-content">
+                        <span class="email-top">
                             <span class="sender">{{ email.sender }}</span>
                             <span class="date">{{ email.date }}</span>
-                        </div>
-                        <div class="subject">{{ email.subject }}</div>
-                        <div class="preview">{{ email.body }}...</div>
-                    </div>
-                    <div class="email-status" id="status-{{ email.id }}">
+                        </span>
+                        <span class="subject">{{ email.subject }}</span>
+                        <span class="preview">{{ email.body }}...</span>
+                    </span>
+                    <span class="email-status" id="status-{{ email.id }}">
                         <span class="badge badge-gray">Not Scanned</span>
-                    </div>
-                </div>
+                    </span>
+                </label>
                 {% endfor %}
             </div>
             {% else %}
@@ -56,77 +51,34 @@
     </div>
 </div>
 
-<style>
-.list-header {
-    padding: 10px 15px;
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 10px;
-}
-
-.email-item {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 15px;
-    background: var(--bg-hover);
-    border-radius: 8px;
-    margin-bottom: 10px;
-    transition: all 0.2s;
-}
-
-.email-content {
-    flex: 1;
-}
-
-.email-top {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-}
-
-.sender { font-weight: 700; color: var(--text-primary); }
-.subject { font-weight: 600; margin-bottom: 4px; }
-.preview { font-size: 12px; color: var(--text-secondary); }
-
-.badge {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-}
-.badge-gray { background: #444; color: #ccc; }
-.badge-red { background: var(--danger); color: white; }
-.badge-orange { background: var(--warning); color: white; }
-.badge-green { background: var(--success); color: white; }
-</style>
-
 <script>
-function toggleAll(source) {
-    const checkboxes = document.querySelectorAll('.email-checkbox');
-    checkboxes.forEach(cb => cb.checked = source.checked);
+function toggleAll() {
+    const boxes = Array.from(document.querySelectorAll('.email-checkbox'));
+    const allOn = boxes.length > 0 && boxes.every(box => box.checked);
+    boxes.forEach(box => { box.checked = !allOn; });
     updateCount();
 }
 
 function updateCount() {
     const count = document.querySelectorAll('.email-checkbox:checked').length;
-    document.getElementById('count').innerText = count;
-    document.getElementById('btn-scan-all').disabled = count === 0;
+    const btn = document.getElementById('btn-scan-all');
+    btn.textContent = `Analyze selected (${count})`;
+    btn.disabled = count === 0;
 }
 
 async function analyzeSelected() {
     const selected = Array.from(document.querySelectorAll('.email-checkbox:checked'));
     const btn = document.getElementById('btn-scan-all');
-    
+    if (!selected.length) return;
+
     btn.disabled = true;
-    btn.innerText = 'Scanning...';
-    
-    for (const cb of selected) {
-        const id = cb.value;
+    btn.textContent = 'Scanning...';
+
+    for (const box of selected) {
+        const id = box.value;
         const statusDiv = document.getElementById(`status-${id}`);
-        statusDiv.innerHTML = '<span class="badge badge-gray">⏳ Scanning...</span>';
-        
+        statusDiv.innerHTML = '<span class="badge badge-gray">Scanning...</span>';
+
         try {
             const token = document.querySelector('meta[name="csrf-token"]').content;
             const res = await fetch(`/gmail/analyze/${id}`, {
@@ -134,14 +86,14 @@ async function analyzeSelected() {
                 headers: {'X-CSRFToken': token}
             });
             const data = await res.json();
-            
+
             if (data.error) {
                 statusDiv.innerHTML = '<span class="badge badge-gray">Error</span>';
             } else {
                 let color = 'green';
                 if (data.risk_level === 'HIGH') color = 'red';
                 if (data.risk_level === 'MEDIUM') color = 'orange';
-                
+
                 const engine = data.engine ? ` <span class="badge badge-gray">${data.engine}</span>` : '';
                 statusDiv.innerHTML = `<span class="badge badge-${color}">${data.risk_level} (${data.risk_score})</span>${engine}`;
             }
@@ -149,9 +101,7 @@ async function analyzeSelected() {
             statusDiv.innerHTML = '<span class="badge badge-gray">Failed</span>';
         }
     }
-    
-    btn.disabled = false;
-    btn.innerText = '⚡ Analyze Selected';
+
     updateCount();
 }
 </script>
