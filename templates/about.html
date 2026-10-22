@@ -97,6 +97,13 @@
                 <li class="feature-item">
                     <span class="feature-icon">✅</span>
                     <div>
+                        <strong>POST-only logout</strong>
+                        <p class="note">Logout is a POST form with the CSRF token. Opening logout with GET is rejected.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
                         <strong>Rate limiting</strong>
                         <p class="note">Failed logins are limited to 5 per minute for the email and 5 per minute for the IP. Registration is limited to 5 posts per minute for the IP.</p>
                     </div>
@@ -104,8 +111,36 @@
                 <li class="feature-item">
                     <span class="feature-icon">✅</span>
                     <div>
+                        <strong>8-character passwords</strong>
+                        <p class="note">Registration and password change reject a password shorter than 8 characters. The forms set the same minimum.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>Initials, no external avatar</strong>
+                        <p class="note">The account menu shows initials from the username. It does not request an avatar from another site.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
                         <strong>Read-only Gmail</strong>
                         <p class="note">The Gmail scope is <code>gmail.readonly</code>. PhishGuard reads messages. It does not modify, send, or delete them.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>Gmail tokens encrypted at rest</strong>
+                        <p class="note">Access and refresh tokens are Fernet-encrypted with SHA-256 of <code>SECRET_KEY</code> before they are stored. A value that cannot be decrypted is treated as disconnected. The Gmail address stays readable.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>OAuth state check</strong>
+                        <p class="note">Google sign-in stores a random state in the session and sends it to Google. If the callback state is missing or does not match, PhishGuard stops before exchanging the code.</p>
                     </div>
                 </li>
                 <li class="feature-item">
