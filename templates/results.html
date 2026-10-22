@@ -18,7 +18,7 @@
 
     <div class="card score-card is-{{ result.risk_level|lower }}">
         <div class="card-body">
-            <span class="risk-badge risk-{{ result.risk_level }}">VERDICT: {{ result.risk_level }} RISK</span>
+            <span class="risk-badge risk-{{ result.risk_level|lower }}">VERDICT: {{ result.risk_level }} RISK</span>
             <h2>Risk Score: {{ result.risk_score }}/100</h2>
             <p class="muted">
                 Engine: {{ result.engine|engine_label }}
@@ -41,12 +41,14 @@
             </div>
         </div>
 
+        {% if result.recommendation %}
         <div class="card">
             <div class="card-body">
             <h3>💡 Recommendation</h3>
             <p class="recommendation">"{{ result.recommendation }}"</p>
             </div>
         </div>
+        {% endif %}
 
         {% if links %}
         <div class="card">
