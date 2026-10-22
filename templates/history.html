@@ -34,7 +34,7 @@
                         {{ item.timestamp.strftime('%Y-%m-%d %H:%M') }}
                     </td>
                     <td>
-                        <span class="risk-badge risk-{{ item.risk_level }}">{{ item.risk_level }}</span>
+                        <span class="risk-badge risk-{{ item.risk_level|lower }}">{{ item.risk_level }}</span>
                     </td>
                     <td>{{ item.engine|engine_label }}</td>
                     <td>{{ item.sender[:20] }}...</td>

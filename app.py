@@ -205,6 +205,9 @@ class AnalysisHistory(db.Model):
     # Short code from PhishingAnalyzer.analyze: AI, Rules, AI + VT, Rules + VT.
     # Rows created before this column existed stay 'Not recorded'.
     engine = db.Column(db.String(40), nullable=False, default='Not recorded')
+    # NULL on rows saved before these columns existed. The email body is not stored.
+    recommendation = db.Column(db.Text, nullable=True)
+    link_checks = db.Column(db.Text, nullable=True)
     
     def get_reasons(self):
         try: return json.loads(self.reasons)
@@ -212,6 +215,39 @@ class AnalysisHistory(db.Model):
     
     def set_reasons(self, reasons_list):
         self.reasons = json.dumps(reasons_list)
+
+    def set_link_checks(self, rows):
+        cleaned = []
+        for item in rows or []:
+            if not isinstance(item, dict):
+                continue
+            cleaned.append({
+                'url': item.get('url') or '',
+                'risk': item.get('risk') or '',
+                'note': item.get('note') or '',
+            })
+        self.link_checks = json.dumps(cleaned)
+
+    def get_link_checks(self):
+        # None means this scan was saved before link checks were stored.
+        if not self.link_checks:
+            return None
+        try:
+            data = json.loads(self.link_checks)
+        except Exception:
+            return None
+        if not isinstance(data, list):
+            return None
+        rows = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            rows.append({
+                'url': item.get('url') or '',
+                'risk': item.get('risk') or '',
+                'note': item.get('note') or '',
+            })
+        return rows
 
 
 class AuthAttempt(db.Model):
@@ -270,12 +306,20 @@ def ensure_history_engine_column():
     if 'analysis_history' not in inspector.get_table_names():
         return
     names = {column['name'] for column in inspector.get_columns('analysis_history')}
-    if 'engine' in names:
+    statements = []
+    if 'engine' not in names:
+        statements.append(
+            "ALTER TABLE analysis_history ADD COLUMN engine VARCHAR(40) NOT NULL DEFAULT 'Not recorded'"
+        )
+    if 'recommendation' not in names:
+        statements.append("ALTER TABLE analysis_history ADD COLUMN recommendation TEXT")
+    if 'link_checks' not in names:
+        statements.append("ALTER TABLE analysis_history ADD COLUMN link_checks TEXT")
+    if not statements:
         return
     with db.engine.begin() as conn:
-        conn.execute(text(
-            "ALTER TABLE analysis_history ADD COLUMN engine VARCHAR(40) NOT NULL DEFAULT 'Not recorded'"
-        ))
+        for statement in statements:
+            conn.execute(text(statement))
 
 with app.app_context():
     db.create_all()
@@ -647,6 +691,8 @@ def analyze_page():
             risk_score=result['risk_score'],
             engine=(result.get('engine') or 'Not recorded')[:40],
         )
+        entry.recommendation = result.get('recommendation') or ''
+        entry.set_link_checks(link_results)
         entry.set_reasons(result['reasons'])
         db.session.add(entry)
         db.session.commit()
@@ -697,27 +743,28 @@ def view_analysis(id):
         return redirect(url_for('history_page'))
     
     engine = entry.engine or 'Not recorded'
+    stored_links = entry.get_link_checks()
     result = {
         'risk_level': entry.risk_level,
         'risk_score': entry.risk_score,
         'reasons': entry.get_reasons(),
-        'recommendation': "Review past analysis." if entry.risk_level == 'LOW' else "Caution advised based on past scan.",
+        'recommendation': entry.recommendation or '',
         'ai_powered': engine.startswith('AI'),
         'engine': engine,
         'ai_body_note': '',
     }
     
-    # Reconstruct email object
-    # Note: We didn't save the full body in the DB to save space, 
-    # so we show a placeholder or what we have.
+    # The body is never stored. Older rows also have no recommendation or link checks.
     email_data = {
         'sender': entry.sender,
         'subject': entry.subject,
         'body': "(Email content was not stored permanently for privacy reasons.)", 
         'date': entry.timestamp.strftime('%Y-%m-%d %H:%M')
     }
+    link_results = stored_links or []
+    links = [row['url'] for row in link_results if row.get('url')]
     
-    return render_template('results.html', result=result, email=email_data, links=[], link_results=[])
+    return render_template('results.html', result=result, email=email_data, links=links, link_results=link_results)
 
 
 @app.route('/history/delete/<int:id>', methods=['POST'])
@@ -1107,7 +1154,7 @@ def gmail_analyze_single(msg_id):
         
         # 1. Run Analysis
         analyzer = PhishingAnalyzer(SYSTEM_GROQ_KEY, SYSTEM_VT_KEY)
-        result, _, _ = analyzer.analyze({
+        result, _, link_results = analyzer.analyze({
             'sender': headers_dict.get('from', ''),
             'subject': headers_dict.get('subject', ''),
             'body': body
@@ -1122,6 +1169,8 @@ def gmail_analyze_single(msg_id):
             risk_score=result['risk_score'],
             engine=(result.get('engine') or 'Not recorded')[:40],
         )
+        entry.recommendation = result.get('recommendation') or ''
+        entry.set_link_checks(link_results)
         entry.set_reasons(result['reasons'])
         db.session.add(entry)
         db.session.commit()
