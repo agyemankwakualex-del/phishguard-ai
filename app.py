@@ -6,8 +6,6 @@ Includes: Centralized API Keys, VirusTotal, Gmail, and Profile Route
 from flask import Flask, abort, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from flask_wtf.csrf import CSRFProtect
 from flask import send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -36,8 +34,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 # Checks POST, PUT, PATCH, and DELETE. GET logout and the Google callback are not checked.
 csrf = CSRFProtect(app)
-# Memory storage is per process. remote_addr is the client IP after ProxyFix.
-limiter = Limiter(get_remote_address, app=app, storage_uri='memory://', default_limits=[])
 
 def normalize_database_url(url):
     # Scheme prefix only. User, password, host, port, path, and query stay as given.
@@ -162,6 +158,17 @@ class AnalysisHistory(db.Model):
     
     def set_reasons(self, reasons_list):
         self.reasons = json.dumps(reasons_list)
+
+
+class AuthAttempt(db.Model):
+    # Shared by every instance. create_all adds this table on startup.
+    __tablename__ = 'auth_attempts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(16), nullable=False)
+    ip = db.Column(db.String(64), nullable=False, default='')
+    email = db.Column(db.String(120), nullable=False, default='')
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now_naive, index=True)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -356,11 +363,70 @@ If External Intel says malicious, risk MUST be HIGH."""
 # ROUTES
 # ============================================================
 
+def client_ip():
+    # Vercel sets x-real-ip to the visitor's public address. Docs:
+    # https://vercel.com/docs/headers/request-headers
+    # x-forwarded-for is that same address (Vercel overwrites it so it cannot be spoofed).
+    # x-vercel-forwarded-for stays put when a proxy in front of Vercel rewrites x-forwarded-for.
+    # @vercel/functions reads x-real-ip. ProxyFix's remote_addr is only the local fallback.
+    for header in ('X-Real-Ip', 'X-Vercel-Forwarded-For', 'X-Forwarded-For'):
+        raw = request.headers.get(header) or ''
+        ip = raw.split(',')[0].strip()
+        if ip:
+            return ip[:64]
+    return (request.remote_addr or 'unknown')[:64]
+
+
+def _prune_auth_attempts(now):
+    cutoff = now - timedelta(minutes=10)
+    AuthAttempt.query.filter(AuthAttempt.created_at < cutoff).delete(synchronize_session=False)
+
+
+def _recent_attempts(action, now, ip=None, email=None):
+    query = AuthAttempt.query.filter(
+        AuthAttempt.action == action,
+        AuthAttempt.created_at >= now - timedelta(minutes=1),
+    )
+    if ip is not None:
+        query = query.filter(AuthAttempt.ip == ip)
+    if email is not None:
+        query = query.filter(AuthAttempt.email == email)
+    return query.count()
+
+
+def auth_attempt_blocked(action, ip, email=''):
+    now = utc_now_naive()
+    _prune_auth_attempts(now)
+    db.session.commit()
+    if action == 'login':
+        if email and _recent_attempts('login', now, email=email) >= 5:
+            return True
+        if ip and _recent_attempts('login', now, ip=ip) >= 5:
+            return True
+        return False
+    return bool(ip) and _recent_attempts('register', now, ip=ip) >= 5
+
+
+def record_auth_attempt(action, ip, email=''):
+    now = utc_now_naive()
+    _prune_auth_attempts(now)
+    db.session.add(AuthAttempt(
+        action=action,
+        ip=ip or '',
+        email=(email or '')[:120],
+        created_at=now,
+    ))
+    db.session.commit()
+
+
 @app.route('/register', methods=['GET', 'POST'])
-@limiter.limit('5 per minute', methods=['POST'])
 def register():
     if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
+        ip = client_ip()
+        if auth_attempt_blocked('register', ip):
+            abort(429)
+        record_auth_attempt('register', ip)
         password = request.form.get('password', '')
         if password != request.form.get('confirm_password', ''):
             flash('Passwords do not match.', 'error')
@@ -377,14 +443,18 @@ def register():
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit('5 per minute', methods=['POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
-        user = User.query.filter_by(email=request.form['email'].lower()).first()
-        if user and user.check_password(request.form['password']):
+        email = (request.form.get('email') or '').strip().lower()[:120]
+        ip = client_ip()
+        if auth_attempt_blocked('login', ip, email):
+            abort(429)
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(request.form.get('password', '')):
             login_user(user, remember=request.form.get('remember') == 'on')
             return redirect(url_for('home'))
+        record_auth_attempt('login', ip, email)
         flash('Invalid email or password.', 'error')
     return render_template('login.html')
 

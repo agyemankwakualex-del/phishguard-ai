@@ -44,7 +44,9 @@ Set these names in the process environment. Leave them unset to boot with rules 
 
 ## Rate limit
 
-`POST /login` and `POST /register` allow 5 requests per minute per IP. The counter is stored in memory for this process, and the IP is `remote_addr` after ProxyFix. On Vercel each instance has its own counter, and a new instance starts from zero. The limit is not shared across instances.
+Failed `POST /login` attempts are rows in `auth_attempts`: 5 per minute for the submitted email, and 5 per minute for the client IP. A successful login is not stored. `POST /register` allows 5 posts per minute for the client IP. The next attempt renders the form again with "Too many attempts. Wait a minute and try again." Rows older than 10 minutes are deleted when a new attempt is checked. `db.create_all` creates the table on startup.
+
+The IP is the `x-real-ip` header. [Vercel sets that to the visitor's public address](https://vercel.com/docs/headers/request-headers), the same value as `x-forwarded-for` (which Vercel overwrites) and `x-vercel-forwarded-for`. If `x-real-ip` is absent, the app uses `x-vercel-forwarded-for`, then `x-forwarded-for`, then `remote_addr`. Counts are in the database, so another serverless instance sees them.
 
 ## Gmail
 
