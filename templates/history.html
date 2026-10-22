@@ -8,6 +8,7 @@
     <div class="section-head">
         <h3>Past Analyses</h3>
         <form action="{{ url_for('clear_history') }}" method="POST" onsubmit="return confirm('Clear all history?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-danger btn-compact">🗑️ Clear History</button>
         </form>
     </div>
@@ -44,6 +45,7 @@
                         
                         <!-- Delete Button (Form required for POST) -->
                         <form action="{{ url_for('delete_analysis', id=item.id) }}" method="POST" onsubmit="return confirm('Delete this record permanently?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-icon btn-delete" title="Delete">
                                 🗑️
                             </button>

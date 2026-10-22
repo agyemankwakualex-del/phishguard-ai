@@ -3,13 +3,16 @@ PhishGuard AI - Final Production Backend
 Includes: Centralized API Keys, VirusTotal, Gmail, and Profile Route
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, send_file
+from flask import Flask, abort, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
 from flask import send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta # <--- Added timedelta
+from datetime import datetime, timedelta, timezone # <--- Added timedelta
 import json
 import re
 import os
@@ -31,6 +34,10 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'phishguard-dev-secret-key-2024')
 # Vercel terminates TLS and forwards the public host and scheme.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+# Checks POST, PUT, PATCH, and DELETE. GET logout and the Google callback are not checked.
+csrf = CSRFProtect(app)
+# Memory storage is per process. remote_addr is the client IP after ProxyFix.
+limiter = Limiter(get_remote_address, app=app, storage_uri='memory://', default_limits=[])
 
 def normalize_database_url(url):
     # Scheme prefix only. User, password, host, port, path, and query stay as given.
@@ -98,6 +105,10 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'error'
 
+def utc_now_naive():
+    # Columns are naive DateTime. Store UTC with tzinfo removed so old rows still compare.
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 # ============================================================
 # DATABASE MODELS
 # ============================================================
@@ -109,7 +120,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now_naive)
     
     # Kept for DB compatibility, but unused in this version
     groq_api_key = db.Column(db.String(256), default='')
@@ -143,7 +154,7 @@ class AnalysisHistory(db.Model):
     risk_level = db.Column(db.String(20), default='LOW')
     risk_score = db.Column(db.Integer, default=0)
     reasons = db.Column(db.Text, default='[]')
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=utc_now_naive)
     
     def get_reasons(self):
         try: return json.loads(self.reasons)
@@ -154,7 +165,7 @@ class AnalysisHistory(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 def log_database_target(uri):
     # Scheme, host, port, and whether DATABASE_URL / DATABASE_HOSTADDR are set.
@@ -209,14 +220,20 @@ class PhishingAnalyzer:
     def check_virustotal(self, urls):
         detailed_results = []
         malicious_count = 0
-        
-        if not self.virustotal_api_key or not urls:
+
+        if not urls:
             return {'malicious_count': 0}, []
+
+        # No key, a 404, or a failed lookup is UNKNOWN. HIGH/MEDIUM/LOW need real stats.
+        if not self.virustotal_api_key:
+            return {'malicious_count': 0}, [
+                {'url': url, 'risk': 'UNKNOWN', 'note': 'Not checked'} for url in urls
+            ]
 
         headers = {"x-apikey": self.virustotal_api_key}
 
         for url in urls:
-            result_entry = {'url': url, 'risk': 'UNKNOWN'}
+            result_entry = {'url': url, 'risk': 'UNKNOWN', 'note': 'Not checked'}
             try:
                 url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
                 api_url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
@@ -226,7 +243,7 @@ class PhishingAnalyzer:
                 if response.status_code == 200:
                     data = response.json()
                     stats = data['data']['attributes']['last_analysis_stats']
-                    
+                    result_entry['note'] = ''
                     if stats['malicious'] > 0:
                         malicious_count += 1
                         result_entry['risk'] = 'HIGH'
@@ -235,9 +252,10 @@ class PhishingAnalyzer:
                     else:
                         result_entry['risk'] = 'LOW'
                 elif response.status_code == 404:
-                    result_entry['risk'] = 'LOW'
-            except Exception as e:
-                print(f"VT Error: {e}")
+                    result_entry['risk'] = 'UNKNOWN'
+                    result_entry['note'] = 'Not in VirusTotal'
+            except Exception:
+                print('VT Error')
             
             detailed_results.append(result_entry)
             
@@ -325,13 +343,13 @@ If External Intel says malicious, risk MUST be HIGH."""
     def analyze(self, email_data, use_ai=True):
         links = self.extract_links(email_data.get('body', ''))
         vt_summary, detailed_link_results = self.check_virustotal(links)
-        
-        if use_ai:
-            result = self.analyze_with_ai(email_data, vt_summary)
-            if result:
-                return result, links, detailed_link_results
-        
-        result = self.analyze_with_rules(email_data, vt_summary)
+        vt_used = bool(self.virustotal_api_key) and bool(links)
+
+        result = self.analyze_with_ai(email_data, vt_summary) if use_ai else None
+        if not result:
+            result = self.analyze_with_rules(email_data, vt_summary)
+        name = 'AI' if result.get('ai_powered') else 'Rules'
+        result['engine'] = f'{name} + VT' if vt_used else name
         return result, links, detailed_link_results
 
 # ============================================================
@@ -339,6 +357,7 @@ If External Intel says malicious, risk MUST be HIGH."""
 # ============================================================
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit('5 per minute', methods=['POST'])
 def register():
     if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
@@ -358,6 +377,7 @@ def register():
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit('5 per minute', methods=['POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('home'))
     if request.method == 'POST':
@@ -368,9 +388,16 @@ def login():
         flash('Invalid email or password.', 'error')
     return render_template('login.html')
 
+@app.errorhandler(429)
+def too_many_requests(_error):
+    flash('Too many attempts. Wait a minute and try again.', 'error')
+    template = 'register.html' if request.path.startswith('/register') else 'login.html'
+    return render_template(template), 429
+
 @app.route('/logout')
 @login_required
 def logout():
+    # GET on purpose. CSRFProtect does not check safe methods.
     logout_user()
     flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
@@ -391,7 +418,7 @@ def home():
     
     # 3. Calculate Weekly Activity (Real-Time)
     # Create a dictionary for the last 7 days initialized to 0
-    today = datetime.utcnow().date()
+    today = utc_now_naive().date()
     dates = [(today - timedelta(days=i)) for i in range(6, -1, -1)] # Last 7 days
     labels = [d.strftime('%a') for d in dates] # Mon, Tue, Wed...
     counts = {d: 0 for d in dates}
@@ -471,7 +498,9 @@ def settings_page():
 @app.route('/history/view/<int:id>')
 @login_required
 def view_analysis(id):
-    entry = AnalysisHistory.query.get_or_404(id)
+    entry = db.session.get(AnalysisHistory, id)
+    if entry is None:
+        abort(404)
     # Security check: ensure this entry belongs to the current user
     if entry.user_id != current_user.id:
         flash('Unauthorized access.', 'error')
@@ -502,7 +531,9 @@ def view_analysis(id):
 @app.route('/history/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_analysis(id):
-    entry = AnalysisHistory.query.get_or_404(id)
+    entry = db.session.get(AnalysisHistory, id)
+    if entry is None:
+        abort(404)
     if entry.user_id != current_user.id:
         flash('Unauthorized.', 'error')
         return redirect(url_for('history_page'))
@@ -731,33 +762,72 @@ def gmail_callback():
         
         if r.status_code == 200:
             tokens = r.json()
-            current_user.gmail_token = tokens['access_token']
-            current_user.gmail_refresh_token = tokens.get('refresh_token', current_user.gmail_refresh_token)
-            
-            # 5. Get Email Address (Now this works because we added the scope above!)
-            user_info = requests.get('https://www.googleapis.com/oauth2/v2/userinfo', headers={'Authorization': f"Bearer {tokens['access_token']}"})
-            
-            if user_info.status_code == 200:
-                current_user.gmail_email = user_info.json().get('email')
+            access_token = tokens.get('access_token') or ''
+            if not access_token:
+                flash('Failed to connect to Google.', 'error')
+                return redirect(url_for('settings_page'))
+            current_user.gmail_token = access_token
+            refresh_token = tokens.get('refresh_token')
+            if refresh_token:
+                current_user.gmail_refresh_token = refresh_token
+            # Keep the tokens even if the email lookup fails.
+            db.session.commit()
+
+            email = ''
+            try:
+                user_info = requests.get(
+                    'https://www.googleapis.com/oauth2/v2/userinfo',
+                    headers={'Authorization': f'Bearer {access_token}'},
+                )
+                if user_info.status_code == 200:
+                    email = (user_info.json() or {}).get('email') or ''
+            except Exception:
+                email = ''
+            if email:
+                current_user.gmail_email = email
                 db.session.commit()
                 flash('Gmail connected successfully!', 'success')
             else:
                 flash('Connected, but could not fetch email address.', 'warning')
         else:
-            # Log the actual error from Google for debugging
-            print(f"GOOGLE ERROR: {r.text}")
+            error_code = ''
+            try:
+                body = r.json()
+                if isinstance(body, dict) and isinstance(body.get('error'), str):
+                    error_code = body['error']
+            except Exception:
+                error_code = ''
+            print(f'GOOGLE ERROR: status={r.status_code} error={error_code}')
             flash('Failed to connect to Google.', 'error')
             
-    except Exception as e:
-        print(f"CONNECTION ERROR: {e}")
+    except Exception:
+        print('CONNECTION ERROR')
         flash('System error during connection.', 'error')
         
     return redirect(url_for('settings_page'))
 
-@app.route('/gmail/disconnect')
+def revoke_gmail_token(token):
+    token = (token or '').strip()
+    if not token:
+        return
+    try:
+        requests.post(
+            'https://oauth2.googleapis.com/revoke',
+            data={'token': token},
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            timeout=5,
+        )
+    except Exception:
+        return
+
+
+@app.route('/gmail/disconnect', methods=['POST'])
 @login_required
 def gmail_disconnect():
+    token = (current_user.gmail_refresh_token or '').strip() or (current_user.gmail_token or '').strip()
+    revoke_gmail_token(token)
     current_user.gmail_token = ''
+    current_user.gmail_refresh_token = ''
     current_user.gmail_email = ''
     db.session.commit()
     flash('Gmail disconnected.', 'success')
@@ -813,7 +883,7 @@ def gmail_scan():
         flash('Error scanning inbox.', 'error')
         return redirect(url_for('home'))
 
-@app.route('/gmail/analyze/<msg_id>')
+@app.route('/gmail/analyze/<msg_id>', methods=['POST'])
 @login_required
 def gmail_analyze_single(msg_id):
     if not current_user.gmail_token: return jsonify({'error': 'No token'})
@@ -853,8 +923,9 @@ def gmail_analyze_single(msg_id):
         # 3. Return result to frontend
         return jsonify(result)
         
-    except Exception as e:
-        return jsonify({'error': str(e)})
+    except Exception:
+        print('Gmail analyze failed')
+        return jsonify({'error': 'Could not analyze this message.'})
     
 @app.route('/site-qr')
 def site_qr():

@@ -47,7 +47,7 @@
             {% for link_data in link_results %}
             <div class="link-row">
                 <div>{{ link_data.url }}</div>
-                <div class="risk is-{{ link_data.risk|lower }}">Risk: {{ link_data.risk }}</div>
+                <div class="risk is-{{ link_data.risk|lower }}">Risk: {{ link_data.risk }}{% if link_data.note %} ({{ link_data.note }}){% endif %}</div>
             </div>
             {% endfor %}
         </div>

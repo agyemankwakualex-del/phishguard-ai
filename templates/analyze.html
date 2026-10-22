@@ -17,6 +17,7 @@
             {% endif %}
             
             <form method="POST" action="{{ url_for('analyze_page') }}" class="analyze-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label for="sender">From (Sender Email)</label>
                     <input type="text" 
