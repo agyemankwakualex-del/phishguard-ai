@@ -62,6 +62,11 @@ def engine_options_for_database(scheme, hostaddr):
 
 
 # Database Config (Handles Render PostgreSQL or Local SQLite)
+# On Vercel the project directory is not a durable disk. /tmp lasts for one instance.
+# Local `python app.py` does not set VERCEL, so an unset DATABASE_URL stays on sqlite:///phishguard.db.
+if not os.environ.get('DATABASE_URL') and os.environ.get('VERCEL'):
+    os.environ['DATABASE_URL'] = 'sqlite:////tmp/phishguard.db'
+
 database_url = normalize_database_url(os.environ.get('DATABASE_URL', 'sqlite:///phishguard.db'))
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
