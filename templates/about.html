@@ -6,90 +6,154 @@
 
 {% block content %}
 <div class="about-container">
-    
-    <!-- Hero Section -->
-    <div class="card center" style="padding: 3rem 1rem;">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">🛡️</div>
-        <h2 style="font-size: 2rem; margin-bottom: 1rem; color: var(--text-primary);">PhishGuard AI</h2>
-        <p style="font-size: 1.2rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto;">
-            Next-generation email security powered by Large Language Models. 
-            Detecting social engineering, fraud, and malicious links in real-time.
-        </p>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
-        
-        <!-- Core Features -->
-        <div class="card">
-            <div class="card-header">
-                <h3>✨ Core Capabilities</h3>
-            </div>
-            <div class="card-body">
-                <ul class="feature-list">
-                    <li class="feature-item">
-                        <span class="feature-icon">🤖</span>
-                        <div>
-                            <strong>Groq AI Engine</strong>
-                            <p class="note">Uses Llama-3 8B for semantic analysis of threat patterns.</p>
-                        </div>
-                    </li>
-                    <li class="feature-item">
-                        <span class="feature-icon">🦠</span>
-                        <div>
-                            <strong>VirusTotal Integration</strong>
-                            <p class="note">Scans extracted URLs against a database of known malware.</p>
-                        </div>
-                    </li>
-                    <li class="feature-item">
-                        <span class="feature-icon">🔒</span>
-                        <div>
-                            <strong>What is stored</strong>
-                            <p class="note">Accounts, Gmail tokens, and analysis history are stored. The full email body is not.</p>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- Threat Grid -->
-        <div class="card">
-            <div class="card-header">
-                <h3>⚠️ Threat Coverage</h3>
-            </div>
-            <div class="card-body">
-                <div class="coverage-grid">
-                    <div class="coverage-tile">
-                        <div class="coverage-icon">🎭</div>
-                        <div class="coverage-label">Impersonation</div>
-                    </div>
-                    <div class="coverage-tile">
-                        <div class="coverage-icon">⏰</div>
-                        <div class="coverage-label">Urgency</div>
-                    </div>
-                    <div class="coverage-tile">
-                        <div class="coverage-icon">🔗</div>
-                        <div class="coverage-label">Malware Links</div>
-                    </div>
-                    <div class="coverage-tile">
-                        <div class="coverage-icon">🎣</div>
-                        <div class="coverage-label">Credential Theft</div>
-                    </div>
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-body center">
+            <p class="about-mark" aria-hidden="true">🛡️</p>
+            <h2 class="about-title">PhishGuard AI</h2>
+            <p class="about-lead">
+                PhishGuard AI is a final-year cyber security project at Accra Technical University.
+                It scores one email at a time, from a paste or from a read-only Gmail message, and keeps the verdict in your history.
+            </p>
         </div>
     </div>
 
-    <!-- Technical Stack Footer -->
     <div class="card">
         <div class="card-header">
-            <h3>🛠️ Technical Stack</h3>
+            <h3>How a scan works</h3>
+        </div>
+        <div class="card-body">
+            <ol class="about-steps">
+                <li>
+                    <strong>Input.</strong>
+                    You paste a sender, subject, and body, or PhishGuard reads one Gmail message with the <code>gmail.readonly</code> scope.
+                    A Gmail body is cut to 100,000 characters before the scan. A paste is the text you submit.
+                </li>
+                <li>
+                    <strong>Links.</strong>
+                    The first 5 unique http and https links are taken from that full text, in the order they appear.
+                    A repeated link is kept once, at its first position.
+                </li>
+                <li>
+                    <strong>VirusTotal.</strong>
+                    When a VirusTotal key is set and at least one link was found, each of those links is checked.
+                    A malicious report is High, a suspicious report is Medium, and a clean report is Low.
+                    No key, a link VirusTotal does not know, a rate limit, or a failed lookup is Unknown.
+                </li>
+                <li>
+                    <strong>AI.</strong>
+                    When AI is on and a Groq key is set, <code>openai/gpt-oss-20b</code> reads the sender, the subject, and the first 2,000 characters of the body.
+                    The request asks Groq for a JSON object and tells the model when VirusTotal found malicious links.
+                </li>
+                <li>
+                    <strong>Rules.</strong>
+                    When AI is off, the Groq key is missing, or the model call fails, built-in rules score urgency and password wording in the full subject and body, plus any malicious VirusTotal hits.
+                    The rules do not run when the model returns a result.
+                </li>
+                <li>
+                    <strong>Score.</strong>
+                    The scan returns one level, High, Medium, or Low, and a score from 0 to 100.
+                    A malicious VirusTotal hit sets the level to High. On an AI result the score is raised to at least 90. On a rules result that hit adds 100 points, and the score is capped at 100.
+                    The engine name is AI or Rules, and it includes VirusTotal when a key was set and links were found.
+                </li>
+                <li>
+                    <strong>History.</strong>
+                    The sender, subject, level, score, reasons, and engine are saved. The email body is not saved.
+                </li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Tech stack</h3>
         </div>
         <div class="card-body chip-row">
-            <span class="badge stack-badge" style="background: #333;">Python Flask</span>
-            <span class="badge stack-badge" style="background: #f55036;">Groq API</span>
-            <span class="badge stack-badge" style="background: #3949ab;">VirusTotal API</span>
-            <span class="badge stack-badge" style="background: #009688;">PostgreSQL</span>
-            <span class="badge stack-badge" style="background: #795548;">SQLAlchemy</span>
+            <span class="badge stack-badge">Flask</span>
+            <span class="badge stack-badge">SQLAlchemy</span>
+            <span class="badge stack-badge">Supabase Postgres</span>
+            <span class="badge stack-badge">Vercel</span>
+            <span class="badge stack-badge">Groq</span>
+            <span class="badge stack-badge">VirusTotal</span>
+            <span class="badge stack-badge">Gmail API (gmail.readonly)</span>
+        </div>
+        <div class="card-body about-stack-note">
+            <p class="note">The deployed app uses Supabase Postgres through <code>DATABASE_URL</code>. A local run with that variable unset uses SQLite. Gmail also requests <code>userinfo.email</code> so the connected address can be shown.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Security and privacy</h3>
+        </div>
+        <div class="card-body">
+            <ul class="feature-list">
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>CSRF</strong>
+                        <p class="note">State-changing forms send a CSRF token. A post without it is rejected.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>Rate limiting</strong>
+                        <p class="note">Failed logins are limited to 5 per minute for the email and 5 per minute for the IP. Registration is limited to 5 posts per minute for the IP.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>Read-only Gmail</strong>
+                        <p class="note">The Gmail scope is <code>gmail.readonly</code>. PhishGuard reads messages. It does not modify, send, or delete them.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>Disconnect revokes the token</strong>
+                        <p class="note">Disconnect asks Google to revoke the refresh token, or the access token if there is no refresh token, and then clears the stored Gmail fields.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">✅</span>
+                    <div>
+                        <strong>History omits the body</strong>
+                        <p class="note">Saved rows keep the sender, subject, score, reasons, and engine. They do not keep the email body.</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Limitations</h3>
+        </div>
+        <div class="card-body">
+            <ul class="feature-list">
+                <li class="feature-item">
+                    <span class="feature-icon">⚠️</span>
+                    <div>
+                        <strong>The model can be wrong</strong>
+                        <p class="note">Groq output is not a guarantee. A failed model call falls back to the built-in rules.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">⚠️</span>
+                    <div>
+                        <strong>The score is not a measured accuracy</strong>
+                        <p class="note">0 to 100 is the model number, or the rule total. It is not a tested accuracy percentage.</p>
+                    </div>
+                </li>
+                <li class="feature-item">
+                    <span class="feature-icon">⚠️</span>
+                    <div>
+                        <strong>VirusTotal can return Unknown</strong>
+                        <p class="note">Unknown means the link was not checked, VirusTotal has no report, the lookup failed, or VirusTotal rate limited the request.</p>
+                    </div>
+                </li>
+            </ul>
         </div>
     </div>
 </div>

@@ -1871,9 +1871,65 @@ a.threat-item.threat-link {
 }
 
 .stack-badge {
-    color: white;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     padding: 5px 10px;
     border-radius: 4px;
+}
+
+#qr-section {
+    scroll-margin-top: 88px;
+}
+
+.status-ok {
+    color: var(--success);
+    font-weight: bold;
+}
+
+.history-empty {
+    text-align: center;
+    padding: 20px;
+}
+
+.about-mark {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: 0.75rem;
+}
+
+.about-title {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+
+.about-lead {
+    max-width: 40rem;
+    margin: 0 auto;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.about-steps {
+    margin: 0;
+    padding-left: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.about-steps li {
+    line-height: 1.55;
+}
+
+.about-stack-note {
+    padding-top: 0;
+}
+
+.about-container code {
+    font-size: 0.92em;
 }
 
 .status-badges {
