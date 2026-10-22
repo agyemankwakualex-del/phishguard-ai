@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="card">
+    <div class="card-body">
     <div class="section-head">
         <h3>Past Analyses</h3>
         <form action="{{ url_for('clear_history') }}" method="POST" onsubmit="return confirm('Clear all history?');">
@@ -13,7 +14,7 @@
         </form>
     </div>
 
-    <div style="overflow-x: auto;">
+    <div class="table-scroll">
         <table class="history-table">
             <thead>
                 <tr>
@@ -23,6 +24,7 @@
                     <th>Sender</th>
                     <th>Subject</th>
                     <th>Score</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -37,8 +39,7 @@
                     <td>{{ item.engine|engine_label }}</td>
                     <td>{{ item.sender[:20] }}...</td>
                     <td>{{ item.subject[:30] }}...</td>
-                    
-                    <!-- ACTIONS COLUMN -->
+                    <td>{{ item.risk_score }}</td>
                     <td class="history-actions">
                         <!-- View Button -->
                         <a href="{{ url_for('view_analysis', id=item.id) }}" class="btn btn-icon btn-quiet" title="View Details">
@@ -56,11 +57,12 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="history-empty">No history found.</td>
+                    <td colspan="7" class="history-empty">No history found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
     </div>
 </div>
 {% endblock %}

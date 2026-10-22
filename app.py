@@ -287,6 +287,25 @@ with app.app_context():
 
 # Characters of the body sent to Groq. Link extraction still uses the full body.
 AI_BODY_LIMIT = 6000
+# One call. The SDK's default is 60s and two retries, which would hold a scan much longer.
+GROQ_TIMEOUT = 20
+
+ENGINE_LABELS = {
+    'AI + VT': 'AI + VirusTotal',
+    'AI': 'AI only',
+    'Rules + VT': 'Rules + VirusTotal',
+    'Rules': 'Rule-based',
+    'Not recorded': 'Not recorded',
+}
+
+
+def groq_model_name():
+    return (os.environ.get('GROQ_MODEL') or 'openai/gpt-oss-20b').strip() or 'openai/gpt-oss-20b'
+
+
+def engine_label(value):
+    key = value or 'Not recorded'
+    return ENGINE_LABELS.get(key, key)
 
 class PhishingAnalyzer:
     def __init__(self, groq_key, vt_key):
@@ -357,7 +376,7 @@ class PhishingAnalyzer:
         
         try:
             from groq import Groq
-            client = Groq(api_key=self.groq_api_key)
+            client = Groq(api_key=self.groq_api_key, timeout=GROQ_TIMEOUT, max_retries=0)
             
             vt_context = ""
             if vt_summary['malicious_count'] > 0:
@@ -379,7 +398,7 @@ Respond in strictly valid JSON:
 }}
 If External Intel says malicious, risk MUST be HIGH."""
 
-            model = (os.environ.get('GROQ_MODEL') or 'openai/gpt-oss-20b').strip() or 'openai/gpt-oss-20b'
+            model = groq_model_name()
             response = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -441,6 +460,7 @@ If External Intel says malicious, risk MUST be HIGH."""
             result = self.analyze_with_rules(email_data, vt_summary)
         name = 'AI' if result.get('ai_powered') else 'Rules'
         result['engine'] = f'{name} + VT' if vt_used else name
+        result['engine_label'] = engine_label(result['engine'])
         result['vt_rate_limited'] = any(item.get('rate_limited') for item in detailed_link_results)
         result['vt_unknown'] = any(item.get('risk') == 'UNKNOWN' for item in detailed_link_results)
         body = email_data.get('body') or ''
@@ -451,16 +471,8 @@ If External Intel says malicious, risk MUST be HIGH."""
         return result, links, detailed_link_results
 
 @app.template_filter('engine_label')
-def engine_label(value):
-    labels = {
-        'AI + VT': 'AI + VirusTotal',
-        'AI': 'AI only',
-        'Rules + VT': 'Rules + VirusTotal',
-        'Rules': 'Rule-based',
-        'Not recorded': 'Not recorded',
-    }
-    key = value or 'Not recorded'
-    return labels.get(key, key)
+def engine_label_filter(value):
+    return engine_label(value)
 
 # ============================================================
 # ROUTES
@@ -751,7 +763,7 @@ def profile_page():
 
 @app.route('/about')
 def about_page():
-    return render_template('about.html', ai_body_limit=AI_BODY_LIMIT)
+    return render_template('about.html', ai_body_limit=AI_BODY_LIMIT, groq_model=groq_model_name())
 
 # ============================================================
 # GMAIL INTEGRATION (Final Fix)

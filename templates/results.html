@@ -4,7 +4,7 @@
 {% block page_title %}Scan Report{% endblock %}
 
 {% block header_actions %}
-<button onclick="generatePDF()" class="action-button primary">
+<button type="button" class="action-button primary" onclick="window.print()">
     📄 Download PDF Report
 </button>
 {% endblock %}
@@ -17,7 +17,7 @@
     </div>
 
     <div class="card score-card is-{{ result.risk_level|lower }}">
-        <div>
+        <div class="card-body">
             <span class="risk-badge risk-{{ result.risk_level }}">VERDICT: {{ result.risk_level }} RISK</span>
             <h2>Risk Score: {{ result.risk_score }}/100</h2>
             <p class="muted">
@@ -31,21 +31,26 @@
 
     <div class="details-grid">
         <div class="card">
+            <div class="card-body">
             <h3>⚠️ Detected Indicators</h3>
-            <ul style="padding-left: 20px;">
+            <ul class="reason-list">
                 {% for reason in result.reasons %}
                 <li>{{ reason }}</li>
                 {% endfor %}
             </ul>
+            </div>
         </div>
 
         <div class="card">
+            <div class="card-body">
             <h3>💡 Recommendation</h3>
-            <p style="font-size: 1.1rem; font-style: italic;">"{{ result.recommendation }}"</p>
+            <p class="recommendation">"{{ result.recommendation }}"</p>
+            </div>
         </div>
 
         {% if links %}
         <div class="card">
+            <div class="card-body">
             <h3>🔗 Link Safety Check</h3>
             {% for link_data in link_results %}
             <div class="link-row">
@@ -53,10 +58,12 @@
                 <div class="risk is-{{ link_data.risk|lower }}">Risk: {{ link_data.risk }}{% if link_data.note %} ({{ link_data.note }}){% endif %}</div>
             </div>
             {% endfor %}
+            </div>
         </div>
         {% endif %}
 
         <div class="card">
+            <div class="card-body">
             <h3>📧 Analyzed Message</h3>
             <div class="email-original">
 <strong>From:</strong> {{ email.sender }}
@@ -64,27 +71,8 @@
 
 {{ email.body }}
             </div>
+            </div>
         </div>
     </div>
 </div>
-
-<script>
-    function generatePDF() {
-        const element = document.getElementById('pdf-area');
-        const header = document.querySelector('.pdf-header');
-        header.style.display = 'block';
-
-        const opt = {
-            margin: 0.5,
-            filename: 'PhishGuard_Scan_Report.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, backgroundColor: '#1e293b' },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
-        html2pdf().set(opt).from(element).save().then(() => {
-            header.style.display = 'none';
-        });
-    }
-</script>
 {% endblock %}

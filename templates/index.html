@@ -92,7 +92,7 @@
             {% if recent_threats %}
                 {% for threat in recent_threats %}
                 <!-- Wrap in link to view detail -->
-                <a href="{{ url_for('view_analysis', id=threat.id) }}" class="threat-item threat-link">
+                <a href="{{ url_for('view_analysis', id=threat.id) }}" class="threat-item threat-link is-{{ threat.risk_level|lower }}">
                     <div class="threat-badge {{ threat.risk_level|lower }}">{{ threat.risk_level }}</div>
                     <div class="threat-info">
                         <strong>
