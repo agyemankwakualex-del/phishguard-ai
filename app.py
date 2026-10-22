@@ -3,13 +3,13 @@ PhishGuard AI - Final Production Backend
 Includes: Centralized API Keys, VirusTotal, Gmail, and Profile Route
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, send_file
+from flask import Flask, abort, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask import send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta # <--- Added timedelta
+from datetime import datetime, timedelta, timezone # <--- Added timedelta
 import json
 import re
 import os
@@ -98,6 +98,10 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'error'
 
+def utc_now_naive():
+    # Columns are naive DateTime. Store UTC with tzinfo removed so old rows still compare.
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 # ============================================================
 # DATABASE MODELS
 # ============================================================
@@ -109,7 +113,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now_naive)
     
     # Kept for DB compatibility, but unused in this version
     groq_api_key = db.Column(db.String(256), default='')
@@ -143,7 +147,7 @@ class AnalysisHistory(db.Model):
     risk_level = db.Column(db.String(20), default='LOW')
     risk_score = db.Column(db.Integer, default=0)
     reasons = db.Column(db.Text, default='[]')
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=utc_now_naive)
     
     def get_reasons(self):
         try: return json.loads(self.reasons)
@@ -154,7 +158,7 @@ class AnalysisHistory(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 def log_database_target(uri):
     # Scheme, host, port, and whether DATABASE_URL / DATABASE_HOSTADDR are set.
@@ -391,7 +395,7 @@ def home():
     
     # 3. Calculate Weekly Activity (Real-Time)
     # Create a dictionary for the last 7 days initialized to 0
-    today = datetime.utcnow().date()
+    today = utc_now_naive().date()
     dates = [(today - timedelta(days=i)) for i in range(6, -1, -1)] # Last 7 days
     labels = [d.strftime('%a') for d in dates] # Mon, Tue, Wed...
     counts = {d: 0 for d in dates}
@@ -471,7 +475,9 @@ def settings_page():
 @app.route('/history/view/<int:id>')
 @login_required
 def view_analysis(id):
-    entry = AnalysisHistory.query.get_or_404(id)
+    entry = db.session.get(AnalysisHistory, id)
+    if entry is None:
+        abort(404)
     # Security check: ensure this entry belongs to the current user
     if entry.user_id != current_user.id:
         flash('Unauthorized access.', 'error')
@@ -502,7 +508,9 @@ def view_analysis(id):
 @app.route('/history/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_analysis(id):
-    entry = AnalysisHistory.query.get_or_404(id)
+    entry = db.session.get(AnalysisHistory, id)
+    if entry is None:
+        abort(404)
     if entry.user_id != current_user.id:
         flash('Unauthorized.', 'error')
         return redirect(url_for('history_page'))
