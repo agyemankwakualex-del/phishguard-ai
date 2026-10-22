@@ -268,8 +268,9 @@ Respond in strictly valid JSON:
 }}
 If External Intel says malicious, risk MUST be HIGH."""
 
+            model = (os.environ.get('GROQ_MODEL') or 'openai/gpt-oss-20b').strip() or 'openai/gpt-oss-20b'
             response = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model=model,
                 messages=[
                     {"role": "system", "content": "JSON only."},
                     {"role": "user", "content": prompt}
