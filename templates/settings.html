@@ -51,9 +51,10 @@
                     <a href="{{ url_for('gmail_scan') }}" class="action-button primary">
                         🔍 Scan Inbox
                     </a>
-                    <a href="{{ url_for('gmail_disconnect') }}" class="action-button danger">
-                        ❌ Disconnect
-                    </a>
+                    <form method="POST" action="{{ url_for('gmail_disconnect') }}" class="gmail-disconnect-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="action-button danger">❌ Disconnect</button>
+                    </form>
                 </div>
             </div>
             {% elif config.gmail_available %}
@@ -88,6 +89,7 @@
 .status-icon { font-size: 28px; }
 .status-info p { color: #888; margin: 4px 0 0 0; font-size: 14px; }
 .gmail-actions { display: flex; gap: 12px; }
+.gmail-disconnect-form { margin: 0; flex: 1; }
 .action-button.danger { background: #e74c3c; }
 </style>
 {% endblock %}

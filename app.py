@@ -743,33 +743,72 @@ def gmail_callback():
         
         if r.status_code == 200:
             tokens = r.json()
-            current_user.gmail_token = tokens['access_token']
-            current_user.gmail_refresh_token = tokens.get('refresh_token', current_user.gmail_refresh_token)
-            
-            # 5. Get Email Address (Now this works because we added the scope above!)
-            user_info = requests.get('https://www.googleapis.com/oauth2/v2/userinfo', headers={'Authorization': f"Bearer {tokens['access_token']}"})
-            
-            if user_info.status_code == 200:
-                current_user.gmail_email = user_info.json().get('email')
+            access_token = tokens.get('access_token') or ''
+            if not access_token:
+                flash('Failed to connect to Google.', 'error')
+                return redirect(url_for('settings_page'))
+            current_user.gmail_token = access_token
+            refresh_token = tokens.get('refresh_token')
+            if refresh_token:
+                current_user.gmail_refresh_token = refresh_token
+            # Keep the tokens even if the email lookup fails.
+            db.session.commit()
+
+            email = ''
+            try:
+                user_info = requests.get(
+                    'https://www.googleapis.com/oauth2/v2/userinfo',
+                    headers={'Authorization': f'Bearer {access_token}'},
+                )
+                if user_info.status_code == 200:
+                    email = (user_info.json() or {}).get('email') or ''
+            except Exception:
+                email = ''
+            if email:
+                current_user.gmail_email = email
                 db.session.commit()
                 flash('Gmail connected successfully!', 'success')
             else:
                 flash('Connected, but could not fetch email address.', 'warning')
         else:
-            # Log the actual error from Google for debugging
-            print(f"GOOGLE ERROR: {r.text}")
+            error_code = ''
+            try:
+                body = r.json()
+                if isinstance(body, dict) and isinstance(body.get('error'), str):
+                    error_code = body['error']
+            except Exception:
+                error_code = ''
+            print(f'GOOGLE ERROR: status={r.status_code} error={error_code}')
             flash('Failed to connect to Google.', 'error')
             
-    except Exception as e:
-        print(f"CONNECTION ERROR: {e}")
+    except Exception:
+        print('CONNECTION ERROR')
         flash('System error during connection.', 'error')
         
     return redirect(url_for('settings_page'))
 
-@app.route('/gmail/disconnect')
+def revoke_gmail_token(token):
+    token = (token or '').strip()
+    if not token:
+        return
+    try:
+        requests.post(
+            'https://oauth2.googleapis.com/revoke',
+            data={'token': token},
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            timeout=5,
+        )
+    except Exception:
+        return
+
+
+@app.route('/gmail/disconnect', methods=['POST'])
 @login_required
 def gmail_disconnect():
+    token = (current_user.gmail_refresh_token or '').strip() or (current_user.gmail_token or '').strip()
+    revoke_gmail_token(token)
     current_user.gmail_token = ''
+    current_user.gmail_refresh_token = ''
     current_user.gmail_email = ''
     db.session.commit()
     flash('Gmail disconnected.', 'success')
@@ -865,8 +904,9 @@ def gmail_analyze_single(msg_id):
         # 3. Return result to frontend
         return jsonify(result)
         
-    except Exception as e:
-        return jsonify({'error': str(e)})
+    except Exception:
+        print('Gmail analyze failed')
+        return jsonify({'error': 'Could not analyze this message.'})
     
 @app.route('/site-qr')
 def site_qr():
